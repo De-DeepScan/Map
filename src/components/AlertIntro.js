@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
  * AlertIntro
  *
  * Вступительный экран с ALERT перед началом
- * - Мигает 3 раза
+ * - Мигает 6 раз
  * - Затем исчезает и показывает планету
  */
 export function AlertIntro({ onComplete }) {
@@ -15,7 +15,7 @@ export function AlertIntro({ onComplete }) {
 
   // Эффект мигания
   useEffect(() => {
-    if (blinkCount >= 3) {
+    if (blinkCount >= 6) {
       // После 3 миганий - начинаем fadeout
       setTimeout(() => {
         setFadeOut(true);
@@ -37,7 +37,7 @@ export function AlertIntro({ onComplete }) {
         }
         return !prev;
       });
-    }, 400); // 400ms на каждое состояние
+    }, 800); // 800ms на каждое состояние (медленнее)
 
     return () => clearInterval(blinkInterval);
   }, [blinkCount, onComplete]);
@@ -74,7 +74,7 @@ export function AlertIntro({ onComplete }) {
       {/* Главный ALERT */}
       <div style={{
         opacity: isOn ? 1 : 0.1,
-        transition: 'opacity 0.15s ease-in-out',
+        transition: 'opacity 0.3s ease-in-out',
         textAlign: 'center',
       }}>
         {/* Иконка предупреждения */}
