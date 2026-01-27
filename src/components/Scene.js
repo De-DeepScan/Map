@@ -27,7 +27,7 @@ import { InfectionHUD } from './InfectionHUD';
  *
  * Inclinaison de l'axe ~23.5° comme la vraie Terre
  */
-function EarthGroup({ onCountrySelect, showGeoJson = true, geoJsonSettings = {}, onStatsUpdate }) {
+function EarthGroup({ onCountrySelect, showGeoJson = true, geoJsonSettings = {}, onStatsUpdate, startAnimation = true }) {
   // Position du "Soleil" pour le calcul de l'éclairage des lumières nocturnes
   const sunPosition = [5, 3, 5];
 
@@ -88,7 +88,7 @@ function EarthGroup({ onCountrySelect, showGeoJson = true, geoJsonSettings = {},
       {/* Система заражения по странам (в пределах границ) */}
       {/* 5 минут = 300000мс / ~200 стран = 1500мс на страну */}
       <CountryInfectionSystem
-        autoStart={true}
+        autoStart={startAnimation}
         startCountry="France"
         spreadInterval={1500}       // 1.5 секунды между заражениями
         infectionDuration={2000}    // 2 секунды на заражение страны
@@ -170,12 +170,20 @@ export function Scene({
   showGeoJson = true,
   geoJsonSettings = {},
   onCountrySelect: externalOnCountrySelect = null,
+  startAnimation = true,
 }) {
   // État du pays sélectionné
   const [selectedCountry, setSelectedCountry] = useState(null);
 
-  // Temps de démarrage de l'infection (pour la news ticker et HUD)
-  const [infectionStartTime] = useState(() => Date.now());
+  // Temps de démarrage de l'infection (обновляется когда startAnimation становится true)
+  const [infectionStartTime, setInfectionStartTime] = useState(null);
+
+  // Запускаем таймер когда анимация начинается
+  useEffect(() => {
+    if (startAnimation && !infectionStartTime) {
+      setInfectionStartTime(Date.now());
+    }
+  }, [startAnimation, infectionStartTime]);
 
   // Статистика заражения для HUD
   const [infectionStats, setInfectionStats] = useState({ infected: 0, total: 200 });
@@ -198,15 +206,19 @@ export function Scene({
       {/* UI: affichage du pays sélectionné */}
       <CountryNameDisplay selectedCountry={selectedCountry} />
 
-      {/* HUD прогресса заражения */}
-      <InfectionHUD
-        startTime={infectionStartTime}
-        totalCountries={infectionStats.total}
-        infectedCountries={infectionStats.infected}
-      />
+      {/* HUD прогресса заражения - показывается после intro */}
+      {startAnimation && (
+        <InfectionHUD
+          startTime={infectionStartTime}
+          totalCountries={infectionStats.total}
+          infectedCountries={infectionStats.infected}
+        />
+      )}
 
-      {/* Nouvelle bande d'actualités */}
-      <NewsTicker startTime={infectionStartTime} isRunning={true} />
+      {/* Nouvelle bande d'actualités - показывается после intro */}
+      {startAnimation && (
+        <NewsTicker startTime={infectionStartTime} isRunning={true} />
+      )}
 
       <Canvas
         // Paramètres de la caméra (position initiale sera changée par CameraAnimator)
@@ -235,8 +247,9 @@ export function Scene({
             startLon={2.3}
             startDistance={3.2}     // Proche au début
             endDistance={6}         // Vue globale à la fin
-            duration={20000}        // 20 secondes d'animation (медленно)
-            delay={1000}            // 1 секунда задержки перед началом
+            duration={20000}        // 20 секунд анимации
+            delay={500}             // Небольшая задержка после intro
+            enabled={startAnimation}
           />
 
           {/* Éclairage de la scène */}
@@ -248,6 +261,7 @@ export function Scene({
             showGeoJson={showGeoJson}
             geoJsonSettings={geoJsonSettings}
             onStatsUpdate={handleStatsUpdate}
+            startAnimation={startAnimation}
           />
 
           {/* Anneaux holographiques de données - en dehors du groupe Terre pour une rotation indépendante */}
