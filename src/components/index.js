@@ -4,6 +4,13 @@ export { Atmosphere } from './Atmosphere';
 export { NightLights } from './NightLights';
 export { Scene } from './Scene';
 
+// GeoJSON Layer - слой с границами стран
+export {
+  GeoJsonLayer,
+  CountryNameDisplay,
+  SORT_MODES,
+} from './GeoJsonLayer';
+
 // Composants d'infection
 export {
   InfectionPoint,
