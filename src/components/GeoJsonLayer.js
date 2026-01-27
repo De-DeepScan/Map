@@ -1,0 +1,449 @@
+
+import { useState, useEffect, useCallback, useMemo, memo, useRef } from 'react';
+import { useFrame } from '@react-three/fiber';
+import * as THREE from 'three';
+import { EARTH_RADIUS } from '../utils/geoUtils';
+
+/**
+ * GeoJsonLayer - Couche de rendu des pays à partir de GeoJSON
+ *
+ * Fonctionnalités:
+ * - Chargement et rendu des données GeoJSON
+ * - Tri des pays (par nom, superficie ou personnalisé)
+ * - Sélection interactive des pays (Alt/Option + clic)
+ * - Contrôle de l'ordre de rendu via renderOrder et depthTest
+ *
+ * Adapté de: https://github.com/NombanaMtechniix/geo-globe-three
+ */
+
+// ============================================
+// PARAMÈTRES DE TRI
+// ============================================
+export const SORT_MODES = {
+  NONE: 'none',           // Ordre tel que dans le GeoJSON
+  NAME_ASC: 'name_asc',   // Par nom A-Z
+  NAME_DESC: 'name_desc', // Par nom Z-A
+  AREA_ASC: 'area_asc',   // Par superficie (les plus petits en premier)
+  AREA_DESC: 'area_desc', // Par superficie (les plus grands en premier - recommandé)
+  CUSTOM: 'custom',       // Fonction de tri personnalisée
+};
+
+/**
+ * Calcul approximatif de la superficie du polygone (pour le tri)
+ */
+function calculateApproximateArea(coordinates) {
+  if (!coordinates || coordinates.length < 3) return 0;
+
+  let area = 0;
+  for (let i = 0; i < coordinates.length; i++) {
+    const j = (i + 1) % coordinates.length;
+    area += coordinates[i][0] * coordinates[j][1];
+    area -= coordinates[j][0] * coordinates[i][1];
+  }
+  return Math.abs(area / 2);
+}
+
+/**
+ * Fonctions de tri
+ */
+const sortFunctions = {
+  [SORT_MODES.NONE]: null,
+  [SORT_MODES.NAME_ASC]: (a, b) => {
+    const nameA = a.properties?.name || a.properties?.admin || '';
+    const nameB = b.properties?.name || b.properties?.admin || '';
+    return nameA.localeCompare(nameB);
+  },
+  [SORT_MODES.NAME_DESC]: (a, b) => {
+    const nameA = a.properties?.name || a.properties?.admin || '';
+    const nameB = b.properties?.name || b.properties?.admin || '';
+    return nameB.localeCompare(nameA);
+  },
+  [SORT_MODES.AREA_ASC]: (a, b) => {
+    const getArea = (feature) => {
+      const coords = feature.geometry?.coordinates;
+      if (!coords) return 0;
+      if (feature.geometry.type === 'Polygon') {
+        return calculateApproximateArea(coords[0]);
+      } else if (feature.geometry.type === 'MultiPolygon') {
+        return coords.reduce((sum, poly) => sum + calculateApproximateArea(poly[0]), 0);
+      }
+      return 0;
+    };
+    return getArea(a) - getArea(b);
+  },
+  [SORT_MODES.AREA_DESC]: (a, b) => {
+    const getArea = (feature) => {
+      const coords = feature.geometry?.coordinates;
+      if (!coords) return 0;
+      if (feature.geometry.type === 'Polygon') {
+        return calculateApproximateArea(coords[0]);
+      } else if (feature.geometry.type === 'MultiPolygon') {
+        return coords.reduce((sum, poly) => sum + calculateApproximateArea(poly[0]), 0);
+      }
+      return 0;
+    };
+    return getArea(b) - getArea(a);
+  },
+};
+
+// ============================================
+// COMPOSANT MESH DU PAYS
+// ============================================
+const CountryMesh = memo(({
+  countryName,
+  ring,
+  featureIndex,
+  isSelected,
+  hasSelection,
+  isInteractive,
+  onCountryClick,
+  // Paramètres visuels
+  defaultColor,
+  selectedColor,
+  defaultOpacity,
+  selectedOpacity,
+  dimmedOpacity,
+  lineWidth,
+  // Paramètres de rendu
+  renderOrderBase,
+  selectedRenderOrder,
+}) => {
+  const radius = EARTH_RADIUS + 0.01; // Légèrement au-dessus de la surface de la Terre
+
+  // Conversion lon/lat en coordonnées 3D
+  const convertToSphereCoordinates = useCallback((lon, lat) => {
+    const phi = (90 - lat) * (Math.PI / 180);
+    const theta = (lon + 180) * (Math.PI / 180);
+    return {
+      x: -radius * Math.sin(phi) * Math.cos(theta),
+      y: radius * Math.cos(phi),
+      z: radius * Math.sin(phi) * Math.sin(theta),
+    };
+  }, [radius]);
+
+  // Géométrie de la ligne de frontière
+  const lineGeometry = useMemo(() => {
+    const points = [];
+    ring.forEach(([lon, lat]) => {
+      const { x, y, z } = convertToSphereCoordinates(lon, lat);
+      points.push(new THREE.Vector3(x, y, z));
+    });
+    return new THREE.BufferGeometry().setFromPoints(points);
+  }, [ring, convertToSphereCoordinates]);
+
+  // Géométrie du polygone rempli (pour le clic)
+  const filledGeometry = useMemo(() => {
+    const points = [];
+    ring.forEach(([lon, lat]) => {
+      const { x, y, z } = convertToSphereCoordinates(lon, lat);
+      points.push(new THREE.Vector3(x, y, z));
+    });
+
+    if (points.length < 3) return null;
+
+    const vertices = [];
+    const indices = [];
+
+    points.forEach((point) => {
+      vertices.push(point.x, point.y, point.z);
+    });
+
+    // Triangulation en éventail
+    for (let i = 1; i < points.length - 1; i++) {
+      indices.push(0, i, i + 1);
+    }
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setIndex(indices);
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+    geometry.computeVertexNormals();
+
+    return geometry;
+  }, [ring, convertToSphereCoordinates]);
+
+  // Gestionnaire de clic
+  const handleClick = useCallback((e) => {
+    if (!isInteractive) return;
+    e.stopPropagation();
+    onCountryClick(isSelected ? null : countryName);
+  }, [isInteractive, isSelected, countryName, onCountryClick]);
+
+  if (!lineGeometry || lineGeometry.attributes.position.count < 3) {
+    return null;
+  }
+
+  // Détermination de la couleur et de l'opacité
+  const currentColor = isSelected ? selectedColor : defaultColor;
+  const currentOpacity = isSelected
+    ? selectedOpacity
+    : hasSelection
+      ? dimmedOpacity
+      : defaultOpacity;
+
+  // Ordre de rendu: les pays sélectionnés sont dessinés au-dessus
+  const currentRenderOrder = isSelected ? selectedRenderOrder : renderOrderBase + featureIndex;
+
+  return (
+    <group>
+      {/* Mesh invisible pour la gestion des clics */}
+      {filledGeometry && isInteractive && (
+        <mesh
+          geometry={filledGeometry}
+          onClick={handleClick}
+          renderOrder={currentRenderOrder}
+        >
+          <meshBasicMaterial
+            transparent
+            opacity={0}
+            side={THREE.DoubleSide}
+            depthTest={true}
+          />
+        </mesh>
+      )}
+
+      {/* Ligne de frontière visible */}
+      <primitive
+        object={
+          new THREE.Line(
+            lineGeometry,
+            new THREE.LineBasicMaterial({
+              color: currentColor,
+              transparent: true,
+              opacity: currentOpacity,
+              linewidth: isSelected ? lineWidth * 2 : lineWidth,
+              depthTest: !isSelected,
+              depthWrite: !isSelected,
+            })
+          )
+        }
+        renderOrder={currentRenderOrder}
+      />
+
+      {/* Remplissage du pays sélectionné */}
+      {isSelected && filledGeometry && (
+        <mesh
+          geometry={filledGeometry}
+          renderOrder={currentRenderOrder - 1}
+        >
+          <meshBasicMaterial
+            color={selectedColor}
+            transparent
+            opacity={0.2}
+            side={THREE.DoubleSide}
+            depthTest={false}
+          />
+        </mesh>
+      )}
+    </group>
+  );
+});
+
+CountryMesh.displayName = 'CountryMesh';
+
+// ============================================
+// COMPOSANT PRINCIPAL GEOJSONLAYER
+// ============================================
+export function GeoJsonLayer({
+  // Source de données
+  geoJsonUrl = '/world.geojson',
+  geoJsonData = null, // Alternative: passer les données directement
+
+  // Tri
+  sortMode = SORT_MODES.AREA_DESC, // Les grands pays sont rendus en premier (en dessous)
+  customSortFn = null, // Fonction (a, b) => number pour SORT_MODES.CUSTOM
+
+  // Interactivité
+  interactive = true,
+  useModifierKey = true, // Exiger Alt/Option pour la sélection
+  onCountrySelect = null, // Callback lors de la sélection d'un pays
+
+  // Paramètres visuels
+  defaultColor = '#ffffff',
+  selectedColor = '#00ff00',
+  defaultOpacity = 0.7,
+  selectedOpacity = 1.0,
+  dimmedOpacity = 0.3,
+  lineWidth = 1,
+
+  // Paramètres de rendu
+  renderOrderBase = 10,
+  selectedRenderOrder = 1000,
+
+  // Rotation avec la Terre
+  rotationSpeed = 0.001,
+}) {
+  const groupRef = useRef();
+  const [geoData, setGeoData] = useState(geoJsonData);
+  const [selectedCountry, setSelectedCountry] = useState(null);
+  const [isModifierPressed, setIsModifierPressed] = useState(false);
+
+  // Chargement du GeoJSON s'il n'est pas passé directement
+  useEffect(() => {
+    if (geoJsonData) {
+      setGeoData(geoJsonData);
+      return;
+    }
+
+    fetch(geoJsonUrl)
+      .then((response) => response.json())
+      .then((data) => setGeoData(data))
+      .catch((error) => console.error('Error loading GeoJSON:', error));
+  }, [geoJsonUrl, geoJsonData]);
+
+  // Suivi du modificateur (Alt/Option)
+  useEffect(() => {
+    if (!useModifierKey) {
+      setIsModifierPressed(true);
+      return;
+    }
+
+    const handleKeyDown = (event) => {
+      if (event.altKey || event.metaKey) {
+        setIsModifierPressed(true);
+      }
+    };
+
+    const handleKeyUp = (event) => {
+      if (!event.altKey && !event.metaKey) {
+        setIsModifierPressed(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [useModifierKey]);
+
+  // Rotation avec la Terre
+  useFrame(() => {
+    if (groupRef.current && rotationSpeed) {
+      groupRef.current.rotation.y += rotationSpeed;
+    }
+  });
+
+  // Gestionnaire de sélection du pays
+  const handleCountryClick = useCallback((countryName) => {
+    setSelectedCountry(countryName);
+    if (onCountrySelect) {
+      onCountrySelect(countryName);
+    }
+  }, [onCountrySelect]);
+
+  // Tri et création des meshes des pays
+  const countryMeshes = useMemo(() => {
+    if (!geoData || !geoData.features) return null;
+
+    // Application du tri
+    let features = [...geoData.features];
+
+    if (sortMode === SORT_MODES.CUSTOM && customSortFn) {
+      features.sort(customSortFn);
+    } else if (sortMode !== SORT_MODES.NONE && sortFunctions[sortMode]) {
+      features.sort(sortFunctions[sortMode]);
+    }
+
+    const meshes = [];
+
+    features.forEach((feature, featureIndex) => {
+      const { geometry, properties } = feature;
+      const countryName = properties?.name || properties?.admin || `Country ${featureIndex}`;
+
+      let coordinateArrays = [];
+
+      if (geometry.type === 'Polygon') {
+        coordinateArrays = geometry.coordinates;
+      } else if (geometry.type === 'MultiPolygon') {
+        coordinateArrays = geometry.coordinates.flat();
+      }
+
+      coordinateArrays.forEach((ring, ringIndex) => {
+        if (ring.length > 2) {
+          const isSelected = selectedCountry === countryName;
+          const hasSelection = selectedCountry !== null;
+
+          meshes.push(
+            <CountryMesh
+              key={`country-${featureIndex}-${ringIndex}`}
+              countryName={countryName}
+              ring={ring}
+              featureIndex={featureIndex}
+              isSelected={isSelected}
+              hasSelection={hasSelection}
+              isInteractive={interactive && isModifierPressed}
+              onCountryClick={handleCountryClick}
+              defaultColor={defaultColor}
+              selectedColor={selectedColor}
+              defaultOpacity={defaultOpacity}
+              selectedOpacity={selectedOpacity}
+              dimmedOpacity={dimmedOpacity}
+              lineWidth={lineWidth}
+              renderOrderBase={renderOrderBase}
+              selectedRenderOrder={selectedRenderOrder}
+            />
+          );
+        }
+      });
+    });
+
+    return meshes;
+  }, [
+    geoData,
+    sortMode,
+    customSortFn,
+    selectedCountry,
+    interactive,
+    isModifierPressed,
+    handleCountryClick,
+    defaultColor,
+    selectedColor,
+    defaultOpacity,
+    selectedOpacity,
+    dimmedOpacity,
+    lineWidth,
+    renderOrderBase,
+    selectedRenderOrder,
+  ]);
+
+  return (
+    <group ref={groupRef}>
+      {countryMeshes}
+    </group>
+  );
+}
+
+// ============================================
+// COMPOSANT UI POUR AFFICHER LE PAYS SÉLECTIONNÉ
+// ============================================
+export const CountryNameDisplay = memo(({ selectedCountry, style = {} }) => {
+  if (!selectedCountry) return null;
+
+  const defaultStyle = {
+    position: 'absolute',
+    top: '24px',
+    left: '24px',
+    zIndex: 30,
+    padding: '8px 16px',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    border: '1px solid rgba(0, 255, 0, 0.5)',
+    backdropFilter: 'blur(4px)',
+    color: '#00ff00',
+    fontFamily: 'monospace',
+    fontSize: '18px',
+    fontWeight: 'bold',
+    textTransform: 'uppercase',
+  };
+
+  return (
+    <div style={{ ...defaultStyle, ...style }}>
+      {selectedCountry}
+    </div>
+  );
+});
+
+CountryNameDisplay.displayName = 'CountryNameDisplay';
+
+export default GeoJsonLayer;

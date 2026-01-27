@@ -20,11 +20,6 @@ function App() {
       {/* Interface d'infection */}
       <InfectionUI stats={infectionStats} />
 
-      {/* Superposition d'informations */}
-      <div className="info-overlay">
-        <h1>Planet Earth</h1>
-        <p>Drag to rotate &bull; Scroll to zoom</p>
-      </div>
     </div>
   );
 }

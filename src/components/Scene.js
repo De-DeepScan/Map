@@ -1,4 +1,4 @@
-import { Suspense } from 'react';
+import { Suspense, useState, useCallback } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Stars, Preload } from '@react-three/drei';
 import { Earth } from './Earth';
@@ -6,6 +6,9 @@ import { Clouds } from './Clouds';
 import { Atmosphere } from './Atmosphere';
 import { NightLights } from './NightLights';
 import { InfectionSystem } from './infection';
+import { GeoJsonLayer, CountryNameDisplay, SORT_MODES } from './GeoJsonLayer';
+import { HolographicRings } from './HolographicRings';
+import { ScanLines } from './ScanLines';
 
 /**
  * Composant EarthGroup (Groupe Terre)
@@ -16,20 +19,46 @@ import { InfectionSystem } from './infection';
  * - Atmosphère (lueur sur les bords)
  * - Lumières nocturnes (villes du côté sombre)
  * - Système d'infection (style Plague Inc)
+ * - Couche GeoJSON avec les frontières des pays
  *
  * Inclinaison de l'axe ~23.5° comme la vraie Terre
  */
-function EarthGroup() {
+function EarthGroup({ onCountrySelect, showGeoJson = true, geoJsonSettings = {} }) {
   // Position du "Soleil" pour le calcul de l'éclairage des lumières nocturnes
   const sunPosition = [5, 3, 5];
+
+  // Paramètres par défaut pour la couche GeoJSON
+  const defaultGeoJsonSettings = {
+    geoJsonUrl: '/world.geojson',
+    sortMode: SORT_MODES.AREA_DESC,  // Les grands pays sont rendus en premier
+    interactive: true,
+    useModifierKey: true,            // Alt/Option + clic pour sélectionner
+    defaultColor: '#ffffff',
+    selectedColor: '#00ff00',
+    defaultOpacity: 0.5,
+    selectedOpacity: 1.0,
+    dimmedOpacity: 0.2,
+    lineWidth: 1,
+    rotationSpeed: 0.001,
+    ...geoJsonSettings,
+  };
 
   return (
     // Inclinaison de l'axe terrestre (23.5 degrés = 0.41 radian)
     <group rotation={[0, 0, 0.41]}>
-      <Earth rotationSpeed={0.001} />
-      <Clouds rotationSpeed={0.0012} />
-      <NightLights rotationSpeed={0.001} lightPosition={sunPosition} />
-      <Atmosphere />
+      {/* Composants de texture de la planète (désactivés) */}
+      {/* <Earth rotationSpeed={0.001} /> */}
+      {/* <Clouds rotationSpeed={0.0012} /> */}
+      {/* <NightLights rotationSpeed={0.001} lightPosition={sunPosition} /> */}
+      {/* <Atmosphere /> */}
+
+      {/* Couche GeoJSON avec les frontières des pays */}
+      {showGeoJson && (
+        <GeoJsonLayer
+          {...defaultGeoJsonSettings}
+          onCountrySelect={onCountrySelect}
+        />
+      )}
 
       {/* Système d'infection Plague Inc */}
       <InfectionSystem
@@ -42,6 +71,14 @@ function EarthGroup() {
         color="#ff0000"
         rotationSpeed={0.001}
       />
+
+      {/* Lignes de scan - effet digital (désactivé) */}
+      {/* <ScanLines
+        earthRadius={2}
+        primaryColor="#00ffff"
+        secondaryColor="#00ff88"
+        enabled={true}
+      /> */}
     </group>
   );
 }
@@ -102,10 +139,49 @@ function Lighting() {
  * - Suspense : chargement asynchrone des textures
  * - OrbitControls : contrôle de la caméra à la souris
  * - Stars : fond étoilé
+ * - GeoJsonLayer : couche avec les frontières des pays (tri, interactivité)
  */
-export function Scene() {
+export function Scene({
+  showGeoJson = true,
+  geoJsonSettings = {},
+  onCountrySelect: externalOnCountrySelect = null,
+}) {
+  // État du pays sélectionné
+  const [selectedCountry, setSelectedCountry] = useState(null);
+
+  // Gestionnaire de sélection de pays
+  const handleCountrySelect = useCallback((countryName) => {
+    setSelectedCountry(countryName);
+    if (externalOnCountrySelect) {
+      externalOnCountrySelect(countryName);
+    }
+  }, [externalOnCountrySelect]);
+
   return (
-    <Canvas
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+      {/* UI: affichage du pays sélectionné */}
+      <CountryNameDisplay selectedCountry={selectedCountry} />
+
+      {/* Indice de contrôle */}
+      {showGeoJson && (
+        <div style={{
+          position: 'absolute',
+          bottom: '24px',
+          right: '24px',
+          zIndex: 30,
+          padding: '8px 12px',
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          border: '1px solid rgba(255, 255, 255, 0.3)',
+          backdropFilter: 'blur(4px)',
+          color: 'white',
+          fontFamily: 'monospace',
+          fontSize: '12px',
+        }}>
+          Hold <strong>Alt/Option</strong> + click to select country
+        </div>
+      )}
+
+      <Canvas
       // Paramètres de la caméra
       camera={{
         position: [0, 0, 6], // Position de la caméra (z=6 = éloigné de la planète)
@@ -130,7 +206,19 @@ export function Scene() {
         <Lighting />
 
         {/* Planète Terre avec toutes ses couches */}
-        <EarthGroup />
+        <EarthGroup
+          onCountrySelect={handleCountrySelect}
+          showGeoJson={showGeoJson}
+          geoJsonSettings={geoJsonSettings}
+        />
+
+        {/* Anneaux holographiques de données - en dehors du groupe Terre pour une rotation indépendante */}
+        <HolographicRings
+          earthRadius={2}
+          primaryColor="#00ffff"
+          secondaryColor="#ff00ff"
+          tertiaryColor="#00ff88"
+        />
 
         {/* Fond étoilé */}
         <Stars
@@ -169,6 +257,7 @@ export function Scene() {
         maxPolarAngle={Math.PI * 0.8}
       />
     </Canvas>
+    </div>
   );
 }
 
