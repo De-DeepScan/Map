@@ -3,3 +3,4 @@ export { InfectionCluster } from './InfectionCluster';
 export { InfectionRoute } from './InfectionRoute';
 export { InfectionOverlay } from './InfectionOverlay';
 export { InfectionSystem } from './InfectionSystem';
+export { InfectionOrigin } from './InfectionOrigin';

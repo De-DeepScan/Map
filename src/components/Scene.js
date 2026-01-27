@@ -1,16 +1,17 @@
-import { Suspense, useState, useCallback, useRef } from 'react';
+import { Suspense, useState, useCallback, useRef, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Stars, Preload } from '@react-three/drei';
 import { Earth } from './Earth';
 import { Clouds } from './Clouds';
 import { Atmosphere } from './Atmosphere';
 import { NightLights } from './NightLights';
-import { InfectionSystem } from './infection';
+import { InfectionSystem, InfectionOrigin } from './infection';
 import { GeoJsonLayer, CountryNameDisplay, SORT_MODES } from './GeoJsonLayer';
 import { HolographicRings } from './HolographicRings';
 import { ScanLines } from './ScanLines';
 import { OceanGridShader } from './OceanGrid';
 import { CameraAnimator } from './CameraAnimator';
+import { NewsTicker } from './NewsTicker';
 
 /**
  * Composant EarthGroup (Groupe Terre)
@@ -73,6 +74,15 @@ function EarthGroup({ onCountrySelect, showGeoJson = true, geoJsonSettings = {} 
           onCountrySelect={onCountrySelect}
         />
       )}
+
+      {/* Point d'origine de l'infection (Paris) - pulsation */}
+      <InfectionOrigin
+        lat={48.9}
+        lon={2.3}
+        color="#ff0000"
+        pulseSpeed={2}
+        rotationSpeed={0.001}
+      />
 
       {/* Système d'infection Plague Inc */}
       <InfectionSystem
@@ -163,6 +173,9 @@ export function Scene({
   // État du pays sélectionné
   const [selectedCountry, setSelectedCountry] = useState(null);
 
+  // Temps de démarrage de l'infection (pour la news ticker)
+  const [infectionStartTime] = useState(() => Date.now());
+
   // Gestionnaire de sélection de pays
   const handleCountrySelect = useCallback((countryName) => {
     setSelectedCountry(countryName);
@@ -176,24 +189,8 @@ export function Scene({
       {/* UI: affichage du pays sélectionné */}
       <CountryNameDisplay selectedCountry={selectedCountry} />
 
-      {/* Indice de contrôle */}
-      {showGeoJson && (
-        <div style={{
-          position: 'absolute',
-          bottom: '24px',
-          right: '24px',
-          zIndex: 30,
-          padding: '8px 12px',
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          border: '1px solid rgba(255, 255, 255, 0.3)',
-          backdropFilter: 'blur(4px)',
-          color: 'white',
-          fontFamily: 'monospace',
-          fontSize: '12px',
-        }}>
-          Hold <strong>Alt/Option</strong> + click to select country
-        </div>
-      )}
+      {/* Nouvelle bande d'actualités */}
+      <NewsTicker startTime={infectionStartTime} isRunning={true} />
 
       <Canvas
         // Paramètres de la caméra (position initiale sera changée par CameraAnimator)
