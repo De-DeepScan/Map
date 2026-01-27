@@ -1,23 +1,30 @@
-import logo from './logo.svg';
+import { useState } from 'react';
+import { Scene } from './components';
+import { InfectionUI } from './components/InfectionUI';
 import './App.css';
 
+/**
+ * Composant App
+ *
+ * Composant principal de l'application
+ * Affiche la scène 3D avec la planète Terre et le système d'infection
+ */
 function App() {
+  const [infectionStats, setInfectionStats] = useState({ infected: 0, routes: 0 });
+
   return (
     <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+      {/* Scène 3D avec la Terre et l'infection */}
+      <Scene onInfectionStats={setInfectionStats} />
+
+      {/* Interface d'infection */}
+      <InfectionUI stats={infectionStats} />
+
+      {/* Superposition d'informations */}
+      <div className="info-overlay">
+        <h1>Planet Earth</h1>
+        <p>Drag to rotate &bull; Scroll to zoom</p>
+      </div>
     </div>
   );
 }
