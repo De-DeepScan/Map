@@ -86,7 +86,7 @@ export function useCountryInfection(config = {}) {
     };
   }, [isRunning, infectionDuration]);
 
-  // Распространение на соседей
+  // Распространение на соседей (несколько стран за раз для быстрого заражения)
   useEffect(() => {
     if (!isRunning || !geoDataLoaded) return;
 
@@ -102,30 +102,41 @@ export function useCountryInfection(config = {}) {
 
         if (fullyInfected.length === 0) return prev;
 
-        // Выбрать случайную страну-источник
-        const sourceCountry = fullyInfected[Math.floor(Math.random() * fullyInfected.length)];
-        const sourceNeighbors = neighbors[sourceCountry] || [];
+        let updated = { ...prev };
+        const now = Date.now();
 
-        // Найти незаражённого соседа
-        const uninfectedNeighbors = sourceNeighbors.filter(n => !prev[n.name]);
+        // Заразить от нескольких источников (чем больше заражено - тем быстрее распространяется)
+        const spreadCount = Math.min(3, Math.ceil(fullyInfected.length / 10) + 1);
 
-        if (uninfectedNeighbors.length === 0) return prev;
+        for (let i = 0; i < spreadCount; i++) {
+          // Выбрать случайную страну-источник
+          const sourceCountry = fullyInfected[Math.floor(Math.random() * fullyInfected.length)];
+          const sourceNeighbors = neighbors[sourceCountry] || [];
 
-        // Заразить ближайшего соседа
-        const randomIndex = Math.floor(Math.random() * Math.min(3, uninfectedNeighbors.length));
-        const targetNeighbor = uninfectedNeighbors[randomIndex];
+          // Найти незаражённого соседа
+          const uninfectedNeighbors = sourceNeighbors.filter(n => !updated[n.name]);
 
-        const updated = {
-          ...prev,
-          [targetNeighbor.name]: {
-            progress: 0,
-            startTime: Date.now(),
-            fullyInfected: false,
-          },
-        };
+          if (uninfectedNeighbors.length > 0) {
+            // Заразить случайного соседа
+            const randomIndex = Math.floor(Math.random() * uninfectedNeighbors.length);
+            const targetNeighbor = uninfectedNeighbors[randomIndex];
 
-        setStats(s => ({ ...s, infected: Object.keys(updated).length }));
-        return updated;
+            updated = {
+              ...updated,
+              [targetNeighbor.name]: {
+                progress: 0,
+                startTime: now,
+                fullyInfected: false,
+              },
+            };
+          }
+        }
+
+        if (Object.keys(updated).length > Object.keys(prev).length) {
+          setStats(s => ({ ...s, infected: Object.keys(updated).length }));
+          return updated;
+        }
+        return prev;
       });
     }, spreadInterval);
 

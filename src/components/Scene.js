@@ -86,12 +86,12 @@ function EarthGroup({ onCountrySelect, showGeoJson = true, geoJsonSettings = {},
       />
 
       {/* Система заражения по странам (в пределах границ) */}
-      {/* 5 минут = 300000мс / ~200 стран = 1500мс на страну */}
+      {/* 5 минут - заражение ускоряется по мере распространения */}
       <CountryInfectionSystem
         autoStart={startAnimation}
         startCountry="France"
-        spreadInterval={1500}       // 1.5 секунды между заражениями
-        infectionDuration={2000}    // 2 секунды на заражение страны
+        spreadInterval={1200}       // 1.2 секунды между волнами (несколько стран за раз)
+        infectionDuration={1500}    // 1.5 секунды на заполнение страны
         color="#ff0000"
         rotationSpeed={0.001}
         onStatsUpdate={onStatsUpdate}
