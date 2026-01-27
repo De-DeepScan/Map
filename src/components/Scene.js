@@ -5,6 +5,7 @@ import { Earth } from './Earth';
 import { Clouds } from './Clouds';
 import { Atmosphere } from './Atmosphere';
 import { NightLights } from './NightLights';
+import { InfectionSystem } from './infection';
 
 /**
  * Composant EarthGroup (Groupe Terre)
@@ -14,6 +15,7 @@ import { NightLights } from './NightLights';
  * - Nuages (couche transparente)
  * - Atmosphère (lueur sur les bords)
  * - Lumières nocturnes (villes du côté sombre)
+ * - Système d'infection (style Plague Inc)
  *
  * Inclinaison de l'axe ~23.5° comme la vraie Terre
  */
@@ -28,6 +30,18 @@ function EarthGroup() {
       <Clouds rotationSpeed={0.0012} />
       <NightLights rotationSpeed={0.001} lightPosition={sunPosition} />
       <Atmosphere />
+
+      {/* Système d'infection Plague Inc */}
+      <InfectionSystem
+        autoStart={true}
+        startCity="Paris"
+        spreadSpeed={2}
+        routeInterval={5}
+        maxClusters={10}
+        maxRoutes={15}
+        color="#ff0000"
+        rotationSpeed={0.001}
+      />
     </group>
   );
 }
