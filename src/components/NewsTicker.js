@@ -65,30 +65,45 @@ export function NewsTicker({ startTime = null, isRunning = true }) {
       left: 0,
       right: 0,
       zIndex: 100,
-      backgroundColor: 'rgba(139, 0, 0, 0.9)',
-      borderTop: '2px solid #ff0000',
+      backgroundColor: 'rgba(0, 10, 20, 0.95)',
+      borderTop: '1px solid #00ffff',
+      borderBottom: '1px solid #00ffff',
       overflow: 'hidden',
-      height: '40px',
+      height: '44px',
       display: 'flex',
       alignItems: 'center',
+      boxShadow: '0 0 20px rgba(0, 255, 255, 0.3), inset 0 0 30px rgba(0, 255, 255, 0.05)',
     }}>
-      {/* Label BREAKING */}
+      {/* Label BREAKING - digital style */}
       <div style={{
-        backgroundColor: '#ff0000',
-        color: 'white',
-        padding: '8px 16px',
-        fontFamily: 'Arial, sans-serif',
+        backgroundColor: 'transparent',
+        border: '1px solid #ff0044',
+        color: '#ff0044',
+        padding: '6px 14px',
+        fontFamily: '"Courier New", "Consolas", monospace',
         fontWeight: 'bold',
-        fontSize: '14px',
+        fontSize: '12px',
         textTransform: 'uppercase',
         whiteSpace: 'nowrap',
-        animation: 'pulse 1s infinite',
-        zIndex: 1,
+        animation: 'glitch 2s infinite',
+        marginLeft: '10px',
+        letterSpacing: '2px',
+        textShadow: '0 0 10px #ff0044, 0 0 20px #ff0044',
+        boxShadow: '0 0 10px rgba(255, 0, 68, 0.5)',
       }}>
-        ⚠ BREAKING
+        ▶ ALERT
       </div>
 
-      {/* Texte défilant */}
+      {/* Séparateur digital */}
+      <div style={{
+        width: '2px',
+        height: '20px',
+        backgroundColor: '#00ffff',
+        margin: '0 15px',
+        boxShadow: '0 0 10px #00ffff',
+      }} />
+
+      {/* Texte défilant - digital style */}
       <div
         ref={tickerRef}
         style={{
@@ -100,14 +115,41 @@ export function NewsTicker({ startTime = null, isRunning = true }) {
         <div style={{
           display: 'inline-block',
           paddingLeft: '100%',
-          animation: 'ticker 15s linear infinite',
-          color: 'white',
-          fontFamily: 'Arial, sans-serif',
-          fontSize: '16px',
-          fontWeight: '500',
+          animation: 'ticker 20s linear infinite',
+          color: '#00ffff',
+          fontFamily: '"Courier New", "Consolas", monospace',
+          fontSize: '14px',
+          fontWeight: 'bold',
+          letterSpacing: '1px',
+          textTransform: 'uppercase',
+          textShadow: '0 0 10px #00ffff, 0 0 20px rgba(0, 255, 255, 0.5)',
         }}>
-          {currentNews} • • • {currentNews} • • •
+          {currentNews} ░░░ {currentNews} ░░░
         </div>
+      </div>
+
+      {/* Indicateur de signal */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '4px',
+        marginRight: '15px',
+        marginLeft: '10px',
+      }}>
+        <div style={{
+          width: '6px',
+          height: '6px',
+          backgroundColor: '#00ff00',
+          borderRadius: '50%',
+          animation: 'blink 1s infinite',
+          boxShadow: '0 0 8px #00ff00',
+        }} />
+        <span style={{
+          fontFamily: '"Courier New", monospace',
+          fontSize: '10px',
+          color: '#00ff00',
+          letterSpacing: '1px',
+        }}>LIVE</span>
       </div>
 
       {/* Styles CSS pour les animations */}
@@ -121,12 +163,31 @@ export function NewsTicker({ startTime = null, isRunning = true }) {
           }
         }
 
-        @keyframes pulse {
+        @keyframes glitch {
+          0%, 90%, 100% {
+            opacity: 1;
+            transform: translateX(0);
+          }
+          92% {
+            opacity: 0.8;
+            transform: translateX(-2px);
+          }
+          94% {
+            opacity: 1;
+            transform: translateX(2px);
+          }
+          96% {
+            opacity: 0.9;
+            transform: translateX(0);
+          }
+        }
+
+        @keyframes blink {
           0%, 100% {
             opacity: 1;
           }
           50% {
-            opacity: 0.7;
+            opacity: 0.3;
           }
         }
       `}</style>
