@@ -1,6 +1,6 @@
-import { useRef, useEffect, useCallback } from 'react';
+import { useRef, useEffect, useCallback, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { InfectionCluster } from './InfectionCluster';
+import { InfectionOverlay } from './InfectionOverlay';
 import { InfectionRoute } from './InfectionRoute';
 import { useInfection } from '../../hooks/useInfection';
 import { MAJOR_CITIES } from '../../utils/geoUtils';
@@ -9,25 +9,26 @@ import { MAJOR_CITIES } from '../../utils/geoUtils';
  * Composant InfectionSystem
  *
  * Système complet de propagation d'infection style Plague Inc
- * - Gère les clusters et routes automatiquement
- * - Crée des routes intercontinentales périodiquement
+ * - Taches 2D qui s'étendent sur la surface (style sépia/encre)
+ * - Routes intercontinentales avec animation
  * - Synchronisé avec la rotation de la Terre
- * - Interface de contrôle via props
  */
 export function InfectionSystem({
   autoStart = false,
-  startCity = null,         // { lat, lon } ou nom de ville
+  startCity = null,
   spreadSpeed = 2,
   routeInterval = 5,
   maxClusters = 10,
   maxRoutes = 15,
-  pointSize = 0.025,
   color = '#ff0000',
-  rotationSpeed = 0.001,    // Doit correspondre à Earth.rotationSpeed
+  rotationSpeed = 0.001,
   onStatsUpdate,
 }) {
-  // Référence pour synchroniser la rotation avec la Terre
   const groupRef = useRef();
+
+  // Points d'infection avec leur rayon qui grandit
+  const [infectionPoints, setInfectionPoints] = useState([]);
+
   const {
     clusters,
     routes,
@@ -65,6 +66,22 @@ export function InfectionSystem({
     }
   }, [autoStart, startCity, startInfection, startRandomInfection]);
 
+  // Convertir clusters en points d'infection avec rayons croissants
+  useEffect(() => {
+    const points = clusters.map((cluster, index) => ({
+      id: cluster.id,
+      lat: cluster.lat,
+      lon: cluster.lon,
+      radius: 0,           // Commence à 0, grandit avec le temps
+      targetRadius: 20,    // Rayon final
+      intensity: 1,
+      startTime: cluster.startTime || Date.now(),
+      isPrimary: index === 0,
+    }));
+
+    setInfectionPoints(points);
+  }, [clusters]);
+
   // Notifier les mises à jour de stats
   useEffect(() => {
     if (onStatsUpdate) {
@@ -78,12 +95,28 @@ export function InfectionSystem({
     handleRouteArrival({ lat, lon, name: route?.targetName || 'Unknown' });
   }, [routes, handleRouteArrival]);
 
-  // Logique de création de routes périodiques + synchronisation rotation
+  // Animation: faire grandir les taches + créer des routes
   useFrame((state) => {
     // Synchroniser la rotation avec la Terre
     if (groupRef.current) {
       groupRef.current.rotation.y += rotationSpeed;
     }
+
+    // Faire grandir les taches d'infection (lentement)
+    setInfectionPoints(prev => prev.map(point => {
+      const elapsed = (Date.now() - point.startTime) / 1000;
+      const growthRate = point.isPrimary ? 0.5 : 0.3; // Croissance lente
+
+      // Croissance avec easing (rapide au début, lent à la fin)
+      const progress = Math.min(1, elapsed * growthRate / point.targetRadius);
+      const easedProgress = 1 - Math.pow(1 - progress, 2);
+
+      return {
+        ...point,
+        radius: easedProgress * point.targetRadius,
+        intensity: 0.7 + 0.3 * easedProgress,
+      };
+    }));
 
     if (!isRunning || clusters.length === 0) return;
 
@@ -93,7 +126,6 @@ export function InfectionSystem({
     if (elapsed - lastRouteTime.current > config.routeInterval) {
       lastRouteTime.current = elapsed;
 
-      // Choisir un cluster source au hasard
       const sourceCluster = clusters[Math.floor(Math.random() * clusters.length)];
       createRoute(sourceCluster.lat, sourceCluster.lon);
     }
@@ -101,23 +133,15 @@ export function InfectionSystem({
 
   return (
     <group ref={groupRef}>
-      {/* Clusters d'infection */}
-      {clusters.map((cluster, index) => (
-        <InfectionCluster
-          key={cluster.id}
-          id={cluster.id}
-          initialLat={cluster.lat}
-          initialLon={cluster.lon}
-          spreadSpeed={spreadSpeed}
-          spreadRadius={12}
-          maxPoints={30}
-          pointSize={pointSize}
-          color={color}
-          delay={index === 0 ? 0 : 0.5}
-        />
-      ))}
+      {/* Overlay 2D de l'infection (taches qui s'étendent) */}
+      <InfectionOverlay
+        infectionPoints={infectionPoints}
+        color={color}
+        maxPoints={50}
+        rotationSpeed={0} // Déjà géré par le groupe parent
+      />
 
-      {/* Routes de transmission */}
+      {/* Routes de transmission (lignes courbes) */}
       {routes.map((route) => (
         <InfectionRoute
           key={route.id}
