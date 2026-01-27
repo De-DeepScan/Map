@@ -12,6 +12,7 @@ import { ScanLines } from './ScanLines';
 import { OceanGridShader } from './OceanGrid';
 import { CameraAnimator } from './CameraAnimator';
 import { NewsTicker } from './NewsTicker';
+import { InfectionHUD } from './InfectionHUD';
 
 /**
  * Composant EarthGroup (Groupe Terre)
@@ -26,7 +27,7 @@ import { NewsTicker } from './NewsTicker';
  *
  * Inclinaison de l'axe ~23.5° comme la vraie Terre
  */
-function EarthGroup({ onCountrySelect, showGeoJson = true, geoJsonSettings = {} }) {
+function EarthGroup({ onCountrySelect, showGeoJson = true, geoJsonSettings = {}, onStatsUpdate }) {
   // Position du "Soleil" pour le calcul de l'éclairage des lumières nocturnes
   const sunPosition = [5, 3, 5];
 
@@ -85,13 +86,15 @@ function EarthGroup({ onCountrySelect, showGeoJson = true, geoJsonSettings = {} 
       />
 
       {/* Система заражения по странам (в пределах границ) */}
+      {/* 5 минут = 300000мс / ~200 стран = 1500мс на страну */}
       <CountryInfectionSystem
         autoStart={true}
         startCountry="France"
-        spreadInterval={2000}       // 2 секунды между заражениями
-        infectionDuration={3000}    // 3 секунды на заражение страны
+        spreadInterval={1500}       // 1.5 секунды между заражениями
+        infectionDuration={2000}    // 2 секунды на заражение страны
         color="#ff0000"
         rotationSpeed={0.001}
+        onStatsUpdate={onStatsUpdate}
       />
 
       {/* Lignes de scan - effet digital (désactivé) */}
@@ -171,8 +174,16 @@ export function Scene({
   // État du pays sélectionné
   const [selectedCountry, setSelectedCountry] = useState(null);
 
-  // Temps de démarrage de l'infection (pour la news ticker)
+  // Temps de démarrage de l'infection (pour la news ticker et HUD)
   const [infectionStartTime] = useState(() => Date.now());
+
+  // Статистика заражения для HUD
+  const [infectionStats, setInfectionStats] = useState({ infected: 0, total: 200 });
+
+  // Обработчик обновления статистики
+  const handleStatsUpdate = useCallback((stats) => {
+    setInfectionStats(stats);
+  }, []);
 
   // Gestionnaire de sélection de pays
   const handleCountrySelect = useCallback((countryName) => {
@@ -186,6 +197,13 @@ export function Scene({
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
       {/* UI: affichage du pays sélectionné */}
       <CountryNameDisplay selectedCountry={selectedCountry} />
+
+      {/* HUD прогресса заражения */}
+      <InfectionHUD
+        startTime={infectionStartTime}
+        totalCountries={infectionStats.total}
+        infectedCountries={infectionStats.infected}
+      />
 
       {/* Nouvelle bande d'actualités */}
       <NewsTicker startTime={infectionStartTime} isRunning={true} />
@@ -229,6 +247,7 @@ export function Scene({
             onCountrySelect={handleCountrySelect}
             showGeoJson={showGeoJson}
             geoJsonSettings={geoJsonSettings}
+            onStatsUpdate={handleStatsUpdate}
           />
 
           {/* Anneaux holographiques de données - en dehors du groupe Terre pour une rotation indépendante */}
