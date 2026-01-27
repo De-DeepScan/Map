@@ -1,4 +1,4 @@
-import { Suspense, useState, useCallback } from 'react';
+import { Suspense, useState, useCallback, useRef } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Stars, Preload } from '@react-three/drei';
 import { Earth } from './Earth';
@@ -10,6 +10,7 @@ import { GeoJsonLayer, CountryNameDisplay, SORT_MODES } from './GeoJsonLayer';
 import { HolographicRings } from './HolographicRings';
 import { ScanLines } from './ScanLines';
 import { OceanGridShader } from './OceanGrid';
+import { CameraAnimator } from './CameraAnimator';
 
 /**
  * Composant EarthGroup (Groupe Terre)
@@ -195,12 +196,12 @@ export function Scene({
       )}
 
       <Canvas
-        // Paramètres de la caméra
+        // Paramètres de la caméra (position initiale sera changée par CameraAnimator)
         camera={{
-          position: [0, 0, 6], // Position de la caméra (z=6 = éloigné de la planète)
-          fov: 45,             // Angle de vue (field of view)
-          near: 0.1,           // Plan de découpe proche
-          far: 1000,           // Plan de découpe éloigné
+          position: [0, 0, 3.2], // Commence proche (sera animé)
+          fov: 45,               // Angle de vue (field of view)
+          near: 0.1,             // Plan de découpe proche
+          far: 1000,             // Plan de découpe éloigné
         }}
         // Activer les ombres
         shadows
@@ -215,6 +216,16 @@ export function Scene({
       >
         {/* Suspense pour le chargement asynchrone des textures */}
         <Suspense fallback={null}>
+          {/* Animation de la caméra: zoom depuis Paris puis vue globale */}
+          <CameraAnimator
+            startLat={48.9}         // Paris
+            startLon={2.3}
+            startDistance={3.2}     // Proche au début
+            endDistance={6}         // Vue globale à la fin
+            duration={20000}        // 20 secondes d'animation (медленно)
+            delay={1000}            // 1 секунда задержки перед началом
+          />
+
           {/* Éclairage de la scène */}
           <Lighting />
 
