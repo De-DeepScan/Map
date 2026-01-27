@@ -7,6 +7,8 @@ import { Atmosphere } from './Atmosphere';
 import { NightLights } from './NightLights';
 import { InfectionSystem } from './infection';
 import { GeoJsonLayer, CountryNameDisplay, SORT_MODES } from './GeoJsonLayer';
+import { HolographicRings } from './HolographicRings';
+import { ScanLines } from './ScanLines';
 
 /**
  * Composant EarthGroup (Groupe Terre)
@@ -67,6 +69,14 @@ function EarthGroup({ onCountrySelect, showGeoJson = true, geoJsonSettings = {} 
         maxRoutes={15}
         color="#ff0000"
         rotationSpeed={0.001}
+      />
+
+      {/* Линии сканирования - digital эффект */}
+      <ScanLines
+        earthRadius={2}
+        primaryColor="#00ffff"
+        secondaryColor="#00ff88"
+        enabled={true}
       />
     </group>
   );
@@ -199,6 +209,14 @@ export function Scene({
           onCountrySelect={handleCountrySelect}
           showGeoJson={showGeoJson}
           geoJsonSettings={geoJsonSettings}
+        />
+
+        {/* Голографические кольца данных - вне группы Земли для независимого вращения */}
+        <HolographicRings
+          earthRadius={2}
+          primaryColor="#00ffff"
+          secondaryColor="#ff00ff"
+          tertiaryColor="#00ff88"
         />
 
         {/* Fond étoilé */}
