@@ -5,7 +5,7 @@ import { Earth } from './Earth';
 import { Clouds } from './Clouds';
 import { Atmosphere } from './Atmosphere';
 import { NightLights } from './NightLights';
-import { InfectionSystem, InfectionOrigin } from './infection';
+import { CountryInfectionSystem, InfectionOrigin } from './infection';
 import { GeoJsonLayer, CountryNameDisplay, SORT_MODES } from './GeoJsonLayer';
 import { HolographicRings } from './HolographicRings';
 import { ScanLines } from './ScanLines';
@@ -84,14 +84,12 @@ function EarthGroup({ onCountrySelect, showGeoJson = true, geoJsonSettings = {} 
         rotationSpeed={0.001}
       />
 
-      {/* Système d'infection Plague Inc */}
-      <InfectionSystem
+      {/* Система заражения по странам (в пределах границ) */}
+      <CountryInfectionSystem
         autoStart={true}
-        startCity="Paris"
-        spreadSpeed={2}
-        routeInterval={5}
-        maxClusters={10}
-        maxRoutes={15}
+        startCountry="France"
+        spreadInterval={2000}       // 2 секунды между заражениями
+        infectionDuration={3000}    // 3 секунды на заражение страны
         color="#ff0000"
         rotationSpeed={0.001}
       />
