@@ -19,7 +19,7 @@ import { ScanLines } from './ScanLines';
  * - Atmosphère (lueur sur les bords)
  * - Lumières nocturnes (villes du côté sombre)
  * - Système d'infection (style Plague Inc)
- * - Слой GeoJSON с границами стран
+ * - Couche GeoJSON avec les frontières des pays
  *
  * Inclinaison de l'axe ~23.5° comme la vraie Terre
  */
@@ -27,12 +27,12 @@ function EarthGroup({ onCountrySelect, showGeoJson = true, geoJsonSettings = {} 
   // Position du "Soleil" pour le calcul de l'éclairage des lumières nocturnes
   const sunPosition = [5, 3, 5];
 
-  // Настройки по умолчанию для GeoJSON слоя
+  // Paramètres par défaut pour la couche GeoJSON
   const defaultGeoJsonSettings = {
     geoJsonUrl: '/world.geojson',
-    sortMode: SORT_MODES.AREA_DESC,  // Большие страны рендерятся первыми
+    sortMode: SORT_MODES.AREA_DESC,  // Les grands pays sont rendus en premier
     interactive: true,
-    useModifierKey: true,            // Alt/Option + клик для выбора
+    useModifierKey: true,            // Alt/Option + clic pour sélectionner
     defaultColor: '#ffffff',
     selectedColor: '#00ff00',
     defaultOpacity: 0.5,
@@ -46,13 +46,13 @@ function EarthGroup({ onCountrySelect, showGeoJson = true, geoJsonSettings = {} 
   return (
     // Inclinaison de l'axe terrestre (23.5 degrés = 0.41 radian)
     <group rotation={[0, 0, 0.41]}>
-      {/* Закомментированные текстурные компоненты планеты */}
+      {/* Composants de texture de la planète (désactivés) */}
       {/* <Earth rotationSpeed={0.001} /> */}
       {/* <Clouds rotationSpeed={0.0012} /> */}
       {/* <NightLights rotationSpeed={0.001} lightPosition={sunPosition} /> */}
       {/* <Atmosphere /> */}
 
-      {/* Слой GeoJSON с границами стран */}
+      {/* Couche GeoJSON avec les frontières des pays */}
       {showGeoJson && (
         <GeoJsonLayer
           {...defaultGeoJsonSettings}
@@ -72,7 +72,7 @@ function EarthGroup({ onCountrySelect, showGeoJson = true, geoJsonSettings = {} 
         rotationSpeed={0.001}
       />
 
-      {/* Линии сканирования - digital эффект (отключено) */}
+      {/* Lignes de scan - effet digital (désactivé) */}
       {/* <ScanLines
         earthRadius={2}
         primaryColor="#00ffff"
@@ -139,17 +139,17 @@ function Lighting() {
  * - Suspense : chargement asynchrone des textures
  * - OrbitControls : contrôle de la caméra à la souris
  * - Stars : fond étoilé
- * - GeoJsonLayer : слой с границами стран (сортировка, интерактивность)
+ * - GeoJsonLayer : couche avec les frontières des pays (tri, interactivité)
  */
 export function Scene({
   showGeoJson = true,
   geoJsonSettings = {},
   onCountrySelect: externalOnCountrySelect = null,
 }) {
-  // Состояние выбранной страны
+  // État du pays sélectionné
   const [selectedCountry, setSelectedCountry] = useState(null);
 
-  // Обработчик выбора страны
+  // Gestionnaire de sélection de pays
   const handleCountrySelect = useCallback((countryName) => {
     setSelectedCountry(countryName);
     if (externalOnCountrySelect) {
@@ -159,10 +159,10 @@ export function Scene({
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-      {/* UI: отображение выбранной страны */}
+      {/* UI: affichage du pays sélectionné */}
       <CountryNameDisplay selectedCountry={selectedCountry} />
 
-      {/* Подсказка по управлению */}
+      {/* Indice de contrôle */}
       {showGeoJson && (
         <div style={{
           position: 'absolute',
@@ -212,7 +212,7 @@ export function Scene({
           geoJsonSettings={geoJsonSettings}
         />
 
-        {/* Голографические кольца данных - вне группы Земли для независимого вращения */}
+        {/* Anneaux holographiques de données - en dehors du groupe Terre pour une rotation indépendante */}
         <HolographicRings
           earthRadius={2}
           primaryColor="#00ffff"
