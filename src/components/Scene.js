@@ -9,6 +9,7 @@ import { InfectionSystem } from './infection';
 import { GeoJsonLayer, CountryNameDisplay, SORT_MODES } from './GeoJsonLayer';
 import { HolographicRings } from './HolographicRings';
 import { ScanLines } from './ScanLines';
+import { OceanGridShader } from './OceanGrid';
 
 /**
  * Composant EarthGroup (Groupe Terre)
@@ -51,6 +52,18 @@ function EarthGroup({ onCountrySelect, showGeoJson = true, geoJsonSettings = {} 
       {/* <Clouds rotationSpeed={0.0012} /> */}
       {/* <NightLights rotationSpeed={0.001} lightPosition={sunPosition} /> */}
       {/* <Atmosphere /> */}
+
+      {/* Grille digitale sur les océans */}
+      <OceanGridShader
+        color="#00ddff"
+        opacity={0.25}
+        gridSize={40}
+        lineWidth={0.012}
+        rotationSpeed={0.001}
+        pulseSpeed={1.0}
+        glowIntensity={1.2}
+        enabled={true}
+      />
 
       {/* Couche GeoJSON avec les frontières des pays */}
       {showGeoJson && (
@@ -182,60 +195,60 @@ export function Scene({
       )}
 
       <Canvas
-      // Paramètres de la caméra
-      camera={{
-        position: [0, 0, 6], // Position de la caméra (z=6 = éloigné de la planète)
-        fov: 45,             // Angle de vue (field of view)
-        near: 0.1,           // Plan de découpe proche
-        far: 1000,           // Plan de découpe éloigné
-      }}
-      // Activer les ombres
-      shadows
-      // Paramètres du moteur de rendu WebGL
-      gl={{
-        antialias: true,           // Lissage des bords
-        alpha: false,              // Fond opaque
-        powerPreference: 'high-performance',
-      }}
-      // Taille du canvas = 100% du conteneur
-      style={{ background: '#000010' }}
-    >
-      {/* Suspense pour le chargement asynchrone des textures */}
-      <Suspense fallback={null}>
-        {/* Éclairage de la scène */}
-        <Lighting />
+        // Paramètres de la caméra
+        camera={{
+          position: [0, 0, 6], // Position de la caméra (z=6 = éloigné de la planète)
+          fov: 45,             // Angle de vue (field of view)
+          near: 0.1,           // Plan de découpe proche
+          far: 1000,           // Plan de découpe éloigné
+        }}
+        // Activer les ombres
+        shadows
+        // Paramètres du moteur de rendu WebGL
+        gl={{
+          antialias: true,           // Lissage des bords
+          alpha: false,              // Fond opaque
+          powerPreference: 'high-performance',
+        }}
+        // Taille du canvas = 100% du conteneur
+        style={{ background: '#000010' }}
+      >
+        {/* Suspense pour le chargement asynchrone des textures */}
+        <Suspense fallback={null}>
+          {/* Éclairage de la scène */}
+          <Lighting />
 
-        {/* Planète Terre avec toutes ses couches */}
-        <EarthGroup
-          onCountrySelect={handleCountrySelect}
-          showGeoJson={showGeoJson}
-          geoJsonSettings={geoJsonSettings}
-        />
+          {/* Planète Terre avec toutes ses couches */}
+          <EarthGroup
+            onCountrySelect={handleCountrySelect}
+            showGeoJson={showGeoJson}
+            geoJsonSettings={geoJsonSettings}
+          />
 
-        {/* Anneaux holographiques de données - en dehors du groupe Terre pour une rotation indépendante */}
-        <HolographicRings
-          earthRadius={2}
-          primaryColor="#00ffff"
-          secondaryColor="#ff00ff"
-          tertiaryColor="#00ff88"
-        />
+          {/* Anneaux holographiques de données - en dehors du groupe Terre pour une rotation indépendante */}
+          <HolographicRings
+            earthRadius={2}
+            primaryColor="#00ffff"
+            secondaryColor="#ff00ff"
+            tertiaryColor="#00ff88"
+          />
 
-        {/* Fond étoilé */}
-        <Stars
-          radius={300}        // Rayon de la sphère d'étoiles
-          depth={60}          // Profondeur de distribution
-          count={20000}       // Nombre d'étoiles
-          factor={7}          // Taille des étoiles
-          saturation={0}      // Saturation (0 = blanches)
-          fade                // Fondu sur les bords
-          speed={0.5}         // Vitesse de scintillement
-        />
+          {/* Fond étoilé */}
+          <Stars
+            radius={300}        // Rayon de la sphère d'étoiles
+            depth={60}          // Profondeur de distribution
+            count={20000}       // Nombre d'étoiles
+            factor={7}          // Taille des étoiles
+            saturation={0}      // Saturation (0 = blanches)
+            fade                // Fondu sur les bords
+            speed={0.5}         // Vitesse de scintillement
+          />
 
-        {/* Préchargement de toutes les textures */}
-        <Preload all />
-      </Suspense>
+          {/* Préchargement de toutes les textures */}
+          <Preload all />
+        </Suspense>
 
-      {/*
+        {/*
         OrbitControls - contrôle de la caméra :
         - enableZoom : molette de la souris pour zoomer
         - enablePan : désactiver le déplacement (rotation uniquement)
@@ -244,19 +257,19 @@ export function Scene({
         - rotateSpeed : vitesse de rotation de la caméra
         - minDistance/maxDistance : limites du zoom
       */}
-      <OrbitControls
-        enableZoom={true}
-        enablePan={false}
-        enableDamping={true}
-        dampingFactor={0.05}
-        rotateSpeed={0.5}
-        minDistance={3}
-        maxDistance={15}
-        // Limitation de la rotation verticale (empêche de retourner la caméra)
-        minPolarAngle={Math.PI * 0.2}
-        maxPolarAngle={Math.PI * 0.8}
-      />
-    </Canvas>
+        <OrbitControls
+          enableZoom={true}
+          enablePan={false}
+          enableDamping={true}
+          dampingFactor={0.05}
+          rotateSpeed={0.5}
+          minDistance={3}
+          maxDistance={15}
+          // Limitation de la rotation verticale (empêche de retourner la caméra)
+          minPolarAngle={Math.PI * 0.2}
+          maxPolarAngle={Math.PI * 0.8}
+        />
+      </Canvas>
     </div>
   );
 }
