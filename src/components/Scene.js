@@ -46,10 +46,11 @@ function EarthGroup({ onCountrySelect, showGeoJson = true, geoJsonSettings = {} 
   return (
     // Inclinaison de l'axe terrestre (23.5 degrés = 0.41 radian)
     <group rotation={[0, 0, 0.41]}>
-      <Earth rotationSpeed={0.001} />
-      <Clouds rotationSpeed={0.0012} />
-      <NightLights rotationSpeed={0.001} lightPosition={sunPosition} />
-      <Atmosphere />
+      {/* Закомментированные текстурные компоненты планеты */}
+      {/* <Earth rotationSpeed={0.001} /> */}
+      {/* <Clouds rotationSpeed={0.0012} /> */}
+      {/* <NightLights rotationSpeed={0.001} lightPosition={sunPosition} /> */}
+      {/* <Atmosphere /> */}
 
       {/* Слой GeoJSON с границами стран */}
       {showGeoJson && (
@@ -71,13 +72,13 @@ function EarthGroup({ onCountrySelect, showGeoJson = true, geoJsonSettings = {} 
         rotationSpeed={0.001}
       />
 
-      {/* Линии сканирования - digital эффект */}
-      <ScanLines
+      {/* Линии сканирования - digital эффект (отключено) */}
+      {/* <ScanLines
         earthRadius={2}
         primaryColor="#00ffff"
         secondaryColor="#00ff88"
         enabled={true}
-      />
+      /> */}
     </group>
   );
 }
