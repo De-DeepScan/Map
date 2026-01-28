@@ -1,7 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Scene } from './components';
-import { InfectionUI } from './components/InfectionUI';
+import { AlertIntro } from './components/AlertIntro';
+import { InfectionComplete } from './components/InfectionComplete';
 import './App.css';
+
+const TOTAL_TIME = 5 * 60 * 1000; // 5 минут
 
 /**
  * Composant App
@@ -10,16 +13,52 @@ import './App.css';
  * Affiche la scène 3D avec la planète Terre et le système d'infection
  */
 function App() {
-  const [infectionStats, setInfectionStats] = useState({ infected: 0, routes: 0 });
+  const [introComplete, setIntroComplete] = useState(false);
+  const [infectionComplete, setInfectionComplete] = useState(false);
+  const [startTime, setStartTime] = useState(null);
+
+  // Запускаем таймер после intro
+  useEffect(() => {
+    if (introComplete && !startTime) {
+      setStartTime(Date.now());
+    }
+  }, [introComplete, startTime]);
+
+  // Проверяем прошло ли 5 минут
+  useEffect(() => {
+    if (!startTime || infectionComplete) return;
+
+    const timer = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      if (elapsed >= TOTAL_TIME) {
+        setInfectionComplete(true);
+        clearInterval(timer);
+      }
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [startTime, infectionComplete]);
+
+  // Callback для завершения заражения (вызывается из Scene)
+  const handleInfectionComplete = useCallback(() => {
+    setInfectionComplete(true);
+  }, []);
 
   return (
     <div className="App">
+      {/* Вступительный экран ALERT */}
+      {!introComplete && (
+        <AlertIntro onComplete={() => setIntroComplete(true)} />
+      )}
+
       {/* Scène 3D avec la Terre et l'infection */}
-      <Scene onInfectionStats={setInfectionStats} />
+      <Scene
+        startAnimation={introComplete}
+        onInfectionComplete={handleInfectionComplete}
+      />
 
-      {/* Interface d'infection */}
-      <InfectionUI stats={infectionStats} />
-
+      {/* Финальный экран - Планета заражена */}
+      <InfectionComplete visible={infectionComplete} />
     </div>
   );
 }

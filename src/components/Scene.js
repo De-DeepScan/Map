@@ -1,14 +1,18 @@
-import { Suspense, useState, useCallback } from 'react';
+import { Suspense, useState, useCallback, useRef, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Stars, Preload } from '@react-three/drei';
 import { Earth } from './Earth';
 import { Clouds } from './Clouds';
 import { Atmosphere } from './Atmosphere';
 import { NightLights } from './NightLights';
-import { InfectionSystem } from './infection';
+import { CountryInfectionSystem, InfectionOrigin } from './infection';
 import { GeoJsonLayer, CountryNameDisplay, SORT_MODES } from './GeoJsonLayer';
 import { HolographicRings } from './HolographicRings';
 import { ScanLines } from './ScanLines';
+import { OceanGridShader } from './OceanGrid';
+import { CameraAnimator } from './CameraAnimator';
+import { NewsTicker } from './NewsTicker';
+import { InfectionHUD } from './InfectionHUD';
 
 /**
  * Composant EarthGroup (Groupe Terre)
@@ -23,7 +27,7 @@ import { ScanLines } from './ScanLines';
  *
  * Inclinaison de l'axe ~23.5° comme la vraie Terre
  */
-function EarthGroup({ onCountrySelect, showGeoJson = true, geoJsonSettings = {} }) {
+function EarthGroup({ onCountrySelect, showGeoJson = true, geoJsonSettings = {}, onStatsUpdate, startAnimation = true }) {
   // Position du "Soleil" pour le calcul de l'éclairage des lumières nocturnes
   const sunPosition = [5, 3, 5];
 
@@ -52,6 +56,18 @@ function EarthGroup({ onCountrySelect, showGeoJson = true, geoJsonSettings = {} 
       {/* <NightLights rotationSpeed={0.001} lightPosition={sunPosition} /> */}
       {/* <Atmosphere /> */}
 
+      {/* Grille digitale sur les océans */}
+      <OceanGridShader
+        color="#00ddff"
+        opacity={0.25}
+        gridSize={40}
+        lineWidth={0.012}
+        rotationSpeed={0.001}
+        pulseSpeed={1.0}
+        glowIntensity={1.2}
+        enabled={true}
+      />
+
       {/* Couche GeoJSON avec les frontières des pays */}
       {showGeoJson && (
         <GeoJsonLayer
@@ -60,16 +76,25 @@ function EarthGroup({ onCountrySelect, showGeoJson = true, geoJsonSettings = {} 
         />
       )}
 
-      {/* Système d'infection Plague Inc */}
-      <InfectionSystem
-        autoStart={true}
-        startCity="Paris"
-        spreadSpeed={2}
-        routeInterval={5}
-        maxClusters={10}
-        maxRoutes={15}
+      {/* Point d'origine de l'infection (Paris) - pulsation */}
+      <InfectionOrigin
+        lat={48.9}
+        lon={2.3}
+        color="#ff0000"
+        pulseSpeed={2}
+        rotationSpeed={0.001}
+      />
+
+      {/* Система заражения по странам (в пределах границ) */}
+      {/* 5 минут - заражение ускоряется по мере распространения */}
+      <CountryInfectionSystem
+        autoStart={startAnimation}
+        startCountry="France"
+        spreadInterval={1200}       // 1.2 секунды между волнами (несколько стран за раз)
+        infectionDuration={1500}    // 1.5 секунды на заполнение страны
         color="#ff0000"
         rotationSpeed={0.001}
+        onStatsUpdate={onStatsUpdate}
       />
 
       {/* Lignes de scan - effet digital (désactivé) */}
@@ -145,9 +170,33 @@ export function Scene({
   showGeoJson = true,
   geoJsonSettings = {},
   onCountrySelect: externalOnCountrySelect = null,
+  startAnimation = true,
+  onInfectionComplete = null,
 }) {
   // État du pays sélectionné
   const [selectedCountry, setSelectedCountry] = useState(null);
+
+  // Temps de démarrage de l'infection (обновляется когда startAnimation становится true)
+  const [infectionStartTime, setInfectionStartTime] = useState(null);
+
+  // Запускаем таймер когда анимация начинается
+  useEffect(() => {
+    if (startAnimation && !infectionStartTime) {
+      setInfectionStartTime(Date.now());
+    }
+  }, [startAnimation, infectionStartTime]);
+
+  // Статистика заражения для HUD
+  const [infectionStats, setInfectionStats] = useState({ infected: 0, total: 200 });
+
+  // Обработчик обновления статистики
+  const handleStatsUpdate = useCallback((stats) => {
+    setInfectionStats(stats);
+    // Если все страны заражены - вызываем callback
+    if (stats.infected > 0 && stats.infected >= stats.total && onInfectionComplete) {
+      onInfectionComplete();
+    }
+  }, [onInfectionComplete]);
 
   // Gestionnaire de sélection de pays
   const handleCountrySelect = useCallback((countryName) => {
@@ -162,80 +211,88 @@ export function Scene({
       {/* UI: affichage du pays sélectionné */}
       <CountryNameDisplay selectedCountry={selectedCountry} />
 
-      {/* Indice de contrôle */}
-      {showGeoJson && (
-        <div style={{
-          position: 'absolute',
-          bottom: '24px',
-          right: '24px',
-          zIndex: 30,
-          padding: '8px 12px',
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          border: '1px solid rgba(255, 255, 255, 0.3)',
-          backdropFilter: 'blur(4px)',
-          color: 'white',
-          fontFamily: 'monospace',
-          fontSize: '12px',
-        }}>
-          Hold <strong>Alt/Option</strong> + click to select country
-        </div>
+      {/* HUD прогресса заражения - показывается после intro */}
+      {startAnimation && (
+        <InfectionHUD
+          startTime={infectionStartTime}
+          totalCountries={infectionStats.total}
+          infectedCountries={infectionStats.infected}
+        />
+      )}
+
+      {/* Nouvelle bande d'actualités - показывается после intro */}
+      {startAnimation && (
+        <NewsTicker startTime={infectionStartTime} isRunning={true} />
       )}
 
       <Canvas
-      // Paramètres de la caméra
-      camera={{
-        position: [0, 0, 6], // Position de la caméra (z=6 = éloigné de la planète)
-        fov: 45,             // Angle de vue (field of view)
-        near: 0.1,           // Plan de découpe proche
-        far: 1000,           // Plan de découpe éloigné
-      }}
-      // Activer les ombres
-      shadows
-      // Paramètres du moteur de rendu WebGL
-      gl={{
-        antialias: true,           // Lissage des bords
-        alpha: false,              // Fond opaque
-        powerPreference: 'high-performance',
-      }}
-      // Taille du canvas = 100% du conteneur
-      style={{ background: '#000010' }}
-    >
-      {/* Suspense pour le chargement asynchrone des textures */}
-      <Suspense fallback={null}>
-        {/* Éclairage de la scène */}
-        <Lighting />
+        // Paramètres de la caméra (position initiale sera changée par CameraAnimator)
+        camera={{
+          position: [0, 0, 3.2], // Commence proche (sera animé)
+          fov: 45,               // Angle de vue (field of view)
+          near: 0.1,             // Plan de découpe proche
+          far: 1000,             // Plan de découpe éloigné
+        }}
+        // Activer les ombres
+        shadows
+        // Paramètres du moteur de rendu WebGL
+        gl={{
+          antialias: true,           // Lissage des bords
+          alpha: false,              // Fond opaque
+          powerPreference: 'high-performance',
+        }}
+        // Taille du canvas = 100% du conteneur
+        style={{ background: '#000010' }}
+      >
+        {/* Suspense pour le chargement asynchrone des textures */}
+        <Suspense fallback={null}>
+          {/* Animation de la caméra: zoom depuis Paris puis vue globale */}
+          <CameraAnimator
+            startLat={48.9}         // Paris
+            startLon={2.3}
+            startDistance={3.2}     // Proche au début
+            endDistance={6}         // Vue globale à la fin
+            duration={20000}        // 20 секунд анимации
+            delay={500}             // Небольшая задержка после intro
+            enabled={startAnimation}
+          />
 
-        {/* Planète Terre avec toutes ses couches */}
-        <EarthGroup
-          onCountrySelect={handleCountrySelect}
-          showGeoJson={showGeoJson}
-          geoJsonSettings={geoJsonSettings}
-        />
+          {/* Éclairage de la scène */}
+          <Lighting />
 
-        {/* Anneaux holographiques de données - en dehors du groupe Terre pour une rotation indépendante */}
-        <HolographicRings
-          earthRadius={2}
-          primaryColor="#00ffff"
-          secondaryColor="#ff00ff"
-          tertiaryColor="#00ff88"
-        />
+          {/* Planète Terre avec toutes ses couches */}
+          <EarthGroup
+            onCountrySelect={handleCountrySelect}
+            showGeoJson={showGeoJson}
+            geoJsonSettings={geoJsonSettings}
+            onStatsUpdate={handleStatsUpdate}
+            startAnimation={startAnimation}
+          />
 
-        {/* Fond étoilé */}
-        <Stars
-          radius={300}        // Rayon de la sphère d'étoiles
-          depth={60}          // Profondeur de distribution
-          count={20000}       // Nombre d'étoiles
-          factor={7}          // Taille des étoiles
-          saturation={0}      // Saturation (0 = blanches)
-          fade                // Fondu sur les bords
-          speed={0.5}         // Vitesse de scintillement
-        />
+          {/* Anneaux holographiques de données - en dehors du groupe Terre pour une rotation indépendante */}
+          <HolographicRings
+            earthRadius={2}
+            primaryColor="#00ffff"
+            secondaryColor="#ff00ff"
+            tertiaryColor="#00ff88"
+          />
 
-        {/* Préchargement de toutes les textures */}
-        <Preload all />
-      </Suspense>
+          {/* Fond étoilé */}
+          <Stars
+            radius={300}        // Rayon de la sphère d'étoiles
+            depth={60}          // Profondeur de distribution
+            count={20000}       // Nombre d'étoiles
+            factor={7}          // Taille des étoiles
+            saturation={0}      // Saturation (0 = blanches)
+            fade                // Fondu sur les bords
+            speed={0.5}         // Vitesse de scintillement
+          />
 
-      {/*
+          {/* Préchargement de toutes les textures */}
+          <Preload all />
+        </Suspense>
+
+        {/*
         OrbitControls - contrôle de la caméra :
         - enableZoom : molette de la souris pour zoomer
         - enablePan : désactiver le déplacement (rotation uniquement)
@@ -244,19 +301,19 @@ export function Scene({
         - rotateSpeed : vitesse de rotation de la caméra
         - minDistance/maxDistance : limites du zoom
       */}
-      <OrbitControls
-        enableZoom={true}
-        enablePan={false}
-        enableDamping={true}
-        dampingFactor={0.05}
-        rotateSpeed={0.5}
-        minDistance={3}
-        maxDistance={15}
-        // Limitation de la rotation verticale (empêche de retourner la caméra)
-        minPolarAngle={Math.PI * 0.2}
-        maxPolarAngle={Math.PI * 0.8}
-      />
-    </Canvas>
+        <OrbitControls
+          enableZoom={true}
+          enablePan={false}
+          enableDamping={true}
+          dampingFactor={0.05}
+          rotateSpeed={0.5}
+          minDistance={3}
+          maxDistance={15}
+          // Limitation de la rotation verticale (empêche de retourner la caméra)
+          minPolarAngle={Math.PI * 0.2}
+          maxPolarAngle={Math.PI * 0.8}
+        />
+      </Canvas>
     </div>
   );
 }

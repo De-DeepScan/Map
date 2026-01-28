@@ -3,19 +3,19 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
 /**
- * HolographicRings - Голографические кольца данных вокруг планеты
+ * HolographicRings - Anneaux holographiques de donnees autour de la planete
  *
- * Создаёт несколько вращающихся колец с:
- * - Бегущими цифрами и символами
- * - Пульсирующим свечением
- * - Разными скоростями вращения
+ * Cree plusieurs anneaux rotatifs avec :
+ * - Des chiffres et symboles defilants
+ * - Une lueur pulsante
+ * - Differentes vitesses de rotation
  */
 
-// Символы для отображения на кольцах
+// Symboles a afficher sur les anneaux
 const DATA_SYMBOLS = '01アイウエオカキクケコ∆∇◊□○●◆▲▼<>{}[]';
 
 /**
- * Отдельное кольцо с данными
+ * Anneau de donnees individuel
  */
 function DataRing({
   radius = 3,
@@ -30,7 +30,7 @@ function DataRing({
   const ringRef = useRef();
   const materialRef = useRef();
 
-  // Создаём геометрию кольца
+  // Creation de la geometrie de l'anneau
   const geometry = useMemo(() => {
     const points = [];
     for (let i = 0; i <= segments; i++) {
@@ -44,16 +44,16 @@ function DataRing({
     return new THREE.BufferGeometry().setFromPoints(points);
   }, [radius, segments]);
 
-  // Анимация
+  // Animation
   useFrame((state) => {
     if (ringRef.current) {
       ringRef.current.rotation.y += rotationSpeed * 0.01;
     }
     if (materialRef.current) {
-      // Пульсация opacity
+      // Pulsation de l'opacite
       const pulse = Math.sin(state.clock.elapsedTime * pulseSpeed) * 0.2 + 0.8;
       materialRef.current.opacity = opacity * pulse;
-      // Анимация dash offset для эффекта движения
+      // Animation du dash offset pour l'effet de mouvement
       materialRef.current.dashOffset -= rotationSpeed * 0.02;
     }
   });
@@ -76,7 +76,8 @@ function DataRing({
 }
 
 /**
- * Плавающие символы данных на орбите
+ * Symboles flottants de donnees en orbite
+ * Les symboles changent periodiquement
  */
 function FloatingSymbols({
   count = 30,
@@ -84,54 +85,87 @@ function FloatingSymbols({
   color = '#00ffff',
   speed = 0.3,
   tilt = 0,
+  changeInterval = 0.8, // Intervalle de changement de symbole (en secondes)
 }) {
   const groupRef = useRef();
   const symbolsRef = useRef([]);
+  const lastChangeRef = useRef([]); // Temps du dernier changement pour chaque symbole
+  const canvasRef = useRef([]); // Canvas pour chaque symbole
 
-  // Генерируем позиции и символы
+  // Generation des positions et symboles
   const symbols = useMemo(() => {
     const items = [];
     for (let i = 0; i < count; i++) {
       const angle = (i / count) * Math.PI * 2;
-      const char = DATA_SYMBOLS[Math.floor(Math.random() * DATA_SYMBOLS.length)];
       items.push({
         angle,
-        char,
         offset: Math.random() * Math.PI * 2,
         speed: 0.5 + Math.random() * 0.5,
+        changeOffset: Math.random() * changeInterval * 2, // Dispersion du temps de changement
       });
     }
+    // Initialisation du temps du dernier changement
+    lastChangeRef.current = items.map(() => 0);
     return items;
-  }, [count]);
+  }, [count, changeInterval]);
+
+  // Fonction de mise a jour de la texture du symbole
+  const updateSymbolTexture = (canvas, texture) => {
+    const ctx = canvas.getContext('2d');
+    const newChar = DATA_SYMBOLS[Math.floor(Math.random() * DATA_SYMBOLS.length)];
+
+    ctx.clearRect(0, 0, 64, 64);
+    ctx.font = 'bold 48px monospace';
+    ctx.fillStyle = color;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(newChar, 32, 32);
+
+    texture.needsUpdate = true;
+  };
 
   useFrame((state) => {
     if (groupRef.current) {
       groupRef.current.rotation.y += speed * 0.01;
     }
 
-    // Обновляем позиции символов
+    const time = state.clock.elapsedTime;
+
+    // Mise a jour des positions des symboles et changement
     symbolsRef.current.forEach((sprite, i) => {
-      if (sprite) {
+      if (sprite && sprite.material && sprite.material.map) {
         const symbol = symbols[i];
-        // Пульсация размера
-        const scale = 0.08 + Math.sin(state.clock.elapsedTime * symbol.speed + symbol.offset) * 0.02;
+
+        // Pulsation de la taille
+        const scale = 0.08 + Math.sin(time * symbol.speed + symbol.offset) * 0.02;
         sprite.scale.set(scale, scale, scale);
 
-        // Мерцание
-        const flicker = Math.sin(state.clock.elapsedTime * 3 + symbol.offset) > 0.3 ? 1 : 0.3;
-        if (sprite.material) {
-          sprite.material.opacity = flicker;
+        // Scintillement
+        const flicker = Math.sin(time * 3 + symbol.offset) > 0.3 ? 1 : 0.3;
+        sprite.material.opacity = flicker;
+
+        // Changement de symbole
+        const timeSinceChange = time - lastChangeRef.current[i];
+        const interval = changeInterval + symbol.changeOffset;
+
+        if (timeSinceChange > interval && canvasRef.current[i]) {
+          updateSymbolTexture(canvasRef.current[i], sprite.material.map);
+          lastChangeRef.current[i] = time;
+          // Nouvel intervalle aleatoire
+          symbol.changeOffset = Math.random() * changeInterval;
         }
       }
     });
   });
 
-  // Создаём canvas текстуру для каждого символа
-  const createSymbolTexture = (char) => {
+  // Creation de la texture canvas pour chaque symbole
+  const createSymbolTexture = (index) => {
     const canvas = document.createElement('canvas');
     canvas.width = 64;
     canvas.height = 64;
     const ctx = canvas.getContext('2d');
+
+    const char = DATA_SYMBOLS[Math.floor(Math.random() * DATA_SYMBOLS.length)];
 
     ctx.fillStyle = 'transparent';
     ctx.fillRect(0, 0, 64, 64);
@@ -141,6 +175,9 @@ function FloatingSymbols({
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(char, 32, 32);
+
+    // Sauvegarde du canvas pour les mises a jour ulterieures
+    canvasRef.current[index] = canvas;
 
     const texture = new THREE.CanvasTexture(canvas);
     texture.needsUpdate = true;
@@ -162,7 +199,7 @@ function FloatingSymbols({
             scale={[0.1, 0.1, 0.1]}
           >
             <spriteMaterial
-              map={createSymbolTexture(symbol.char)}
+              map={createSymbolTexture(i)}
               transparent
               opacity={0.8}
               depthWrite={false}
@@ -176,7 +213,7 @@ function FloatingSymbols({
 }
 
 /**
- * Светящаяся дуга (сегмент кольца)
+ * Arc lumineux (segment d'anneau)
  */
 function GlowingArc({
   radius = 3,
@@ -230,7 +267,7 @@ function GlowingArc({
 }
 
 /**
- * Главный компонент - все голографические кольца
+ * Composant principal - tous les anneaux holographiques
  */
 export function HolographicRings({
   earthRadius = 2,
@@ -242,7 +279,7 @@ export function HolographicRings({
 
   return (
     <group ref={groupRef}>
-      {/* Основное кольцо - горизонтальное */}
+      {/* Anneau principal - horizontal */}
       <DataRing
         radius={earthRadius + 0.8}
         color={primaryColor}
@@ -253,7 +290,7 @@ export function HolographicRings({
         pulseSpeed={1.5}
       />
 
-      {/* Второе кольцо - наклонное */}
+      {/* Deuxieme anneau - incline */}
       <DataRing
         radius={earthRadius + 1.0}
         color={secondaryColor}
@@ -264,7 +301,7 @@ export function HolographicRings({
         pulseSpeed={2}
       />
 
-      {/* Третье кольцо - другой наклон */}
+      {/* Troisieme anneau - autre inclinaison */}
       <DataRing
         radius={earthRadius + 1.2}
         color={tertiaryColor}
@@ -275,7 +312,7 @@ export function HolographicRings({
         pulseSpeed={1}
       />
 
-      {/* Плавающие символы на первом кольце */}
+      {/* Symboles flottants sur le premier anneau */}
       <FloatingSymbols
         count={25}
         radius={earthRadius + 0.85}
@@ -284,7 +321,7 @@ export function HolographicRings({
         tilt={Math.PI / 12}
       />
 
-      {/* Плавающие символы на втором кольце */}
+      {/* Symboles flottants sur le deuxieme anneau */}
       <FloatingSymbols
         count={20}
         radius={earthRadius + 1.05}
@@ -293,7 +330,7 @@ export function HolographicRings({
         tilt={Math.PI / 4}
       />
 
-      {/* Светящиеся дуги - акценты */}
+      {/* Arcs lumineux - accents */}
       <GlowingArc
         radius={earthRadius + 0.75}
         startAngle={0}
