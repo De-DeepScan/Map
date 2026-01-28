@@ -171,6 +171,7 @@ export function Scene({
   geoJsonSettings = {},
   onCountrySelect: externalOnCountrySelect = null,
   startAnimation = true,
+  onInfectionComplete = null,
 }) {
   // État du pays sélectionné
   const [selectedCountry, setSelectedCountry] = useState(null);
@@ -191,7 +192,11 @@ export function Scene({
   // Обработчик обновления статистики
   const handleStatsUpdate = useCallback((stats) => {
     setInfectionStats(stats);
-  }, []);
+    // Если все страны заражены - вызываем callback
+    if (stats.infected > 0 && stats.infected >= stats.total && onInfectionComplete) {
+      onInfectionComplete();
+    }
+  }, [onInfectionComplete]);
 
   // Gestionnaire de sélection de pays
   const handleCountrySelect = useCallback((countryName) => {
