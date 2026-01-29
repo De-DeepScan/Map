@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 
 /**
  * InfectionHUD
@@ -20,7 +20,7 @@ export function InfectionHUD({
   const [timeLeft, setTimeLeft] = useState(TOTAL_TIME);
   const [displayProgress, setDisplayProgress] = useState(0);
 
-  // Обратный отсчёт
+  // Обратный отсчёт - optimisé à 250ms au lieu de 100ms (4 updates/sec au lieu de 10)
   useEffect(() => {
     if (!startTime) return;
 
@@ -28,12 +28,12 @@ export function InfectionHUD({
       const elapsed = Date.now() - startTime;
       const remaining = Math.max(0, TOTAL_TIME - elapsed);
       setTimeLeft(remaining);
-    }, 100);
+    }, 250);
 
     return () => clearInterval(interval);
   }, [startTime]);
 
-  // Плавная анимация прогресса
+  // Плавная анимация прогресса - optimisé à 250ms au lieu de 50ms (4 updates/sec au lieu de 20)
   useEffect(() => {
     const targetProgress = Math.min(100, (infectedCountries / totalCountries) * 100);
 
@@ -41,11 +41,12 @@ export function InfectionHUD({
       setDisplayProgress(prev => {
         const diff = targetProgress - prev;
         if (Math.abs(diff) < 0.5) return targetProgress;
-        return prev + diff * 0.1;
+        // Accélérer l'interpolation pour compenser la fréquence plus basse
+        return prev + diff * 0.3;
       });
     };
 
-    const interval = setInterval(animate, 50);
+    const interval = setInterval(animate, 250);
     return () => clearInterval(interval);
   }, [infectedCountries, totalCountries]);
 

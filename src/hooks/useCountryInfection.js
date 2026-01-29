@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { extractCountryData, findNeighbors } from '../utils/countryUtils';
-
+import { useGeoJson } from '../context/GeoJsonContext';
+                                                                                                                                                                                                                                                                        
 /**
  * Hook useCountryInfection
  *
@@ -18,6 +19,8 @@ export function useCountryInfection(config = {}) {
     neighborDistance = 30,
   } = config;
 
+  const { geoData: contextGeoData } = useGeoJson();
+
   // Состояние заражённых стран: { countryName: { progress: 0-1, startTime, fullyInfected } }
   const [infectedCountries, setInfectedCountries] = useState({});
   const [isRunning, setIsRunning] = useState(false);
@@ -31,23 +34,20 @@ export function useCountryInfection(config = {}) {
   const spreadTimerRef = useRef(null);
   const progressTimerRef = useRef(null);
 
-  // Загрузка GeoJSON
+  // Загрузка GeoJSON из Context
   useEffect(() => {
-    fetch(geoJsonUrl)
-      .then(response => response.json())
-      .then(data => {
-        const countryData = extractCountryData(data);
-        const neighborData = findNeighbors(countryData, neighborDistance);
+    if (!contextGeoData) return;
 
-        setCountries(countryData);
-        setNeighbors(neighborData);
-        setStats(prev => ({ ...prev, total: countryData.length }));
-        setGeoDataLoaded(true);
-      })
-      .catch(error => console.error('Error loading GeoJSON:', error));
-  }, [geoJsonUrl, neighborDistance]);
+    const countryData = extractCountryData(contextGeoData);
+    const neighborData = findNeighbors(countryData, neighborDistance);
 
-  // Обновление прогресса заражения
+    setCountries(countryData);
+    setNeighbors(neighborData);
+    setStats(prev => ({ ...prev, total: countryData.length }));
+    setGeoDataLoaded(true);
+  }, [contextGeoData, neighborDistance]);
+
+  // Обновление прогресса заражения - OPTIMISÉ pour éviter les plantages
   useEffect(() => {
     if (!isRunning) return;
 
@@ -55,29 +55,36 @@ export function useCountryInfection(config = {}) {
       const now = Date.now();
 
       setInfectedCountries(prev => {
+        // Filtrer seulement les pays pas encore à 100% (OPTIMISATION CRITIQUE)
+        const inProgressCountries = Object.keys(prev).filter(
+          name => !prev[name].fullyInfected
+        );
+
+        // Si tous les pays sont à 100%, pas besoin de recalculer!
+        if (inProgressCountries.length === 0) return prev;
+
         const updated = { ...prev };
         let changed = false;
 
-        Object.keys(updated).forEach(countryName => {
+        // Traiter UNIQUEMENT les pays en cours d'infection (pas tous les 200!)
+        inProgressCountries.forEach(countryName => {
           const infection = updated[countryName];
-          if (!infection.fullyInfected) {
-            const elapsed = now - infection.startTime;
-            const newProgress = Math.min(1, elapsed / infectionDuration);
+          const elapsed = now - infection.startTime;
+          const newProgress = Math.min(1, elapsed / infectionDuration);
 
-            if (newProgress !== infection.progress) {
-              updated[countryName] = {
-                ...infection,
-                progress: newProgress,
-                fullyInfected: newProgress >= 1,
-              };
-              changed = true;
-            }
+          if (newProgress !== infection.progress) {
+            updated[countryName] = {
+              ...infection,
+              progress: newProgress,
+              fullyInfected: newProgress >= 1,
+            };
+            changed = true;
           }
         });
 
         return changed ? updated : prev;
       });
-    }, 100);
+    }, 500);  // Réduit de 100ms à 500ms (80% moins d'updates!)
 
     return () => {
       if (progressTimerRef.current) {

@@ -83,6 +83,103 @@ export function createArcBetweenPoints(start, end, height = 0.5) {
 }
 
 /**
+ * Interpole un point sur la surface de la sphère entre deux positions lat/lon
+ * Suit un "great circle" (arc de grand cercle) pour une meilleure forme
+ * @param {number} lat1 - Latitude du point 1
+ * @param {number} lon1 - Longitude du point 1
+ * @param {number} lat2 - Latitude du point 2
+ * @param {number} lon2 - Longitude du point 2
+ * @param {number} t - Position sur l'arc (0 = point 1, 1 = point 2)
+ * @param {number} radius - Rayon de la sphère
+ * @returns {THREE.Vector3}
+ */
+export function interpolateOnSphere(lat1, lon1, lat2, lon2, t, radius = EARTH_RADIUS) {
+  // Convertir en vecteurs 3D
+  const p1 = latLonToVector3(lat1, lon1, radius);
+  const p2 = latLonToVector3(lat2, lon2, radius);
+
+  // Interpolation sphérique (slerp)
+  const angle = p1.angleTo(p2);
+
+  if (angle < 0.001) {
+    // Points très proches, interpolation linéaire suffit
+    return p1.clone().lerp(p2, t);
+  }
+
+  // Slerp pour suivre la courbure de la sphère
+  const sinAngle = Math.sin(angle);
+  const a = Math.sin((1 - t) * angle) / sinAngle;
+  const b = Math.sin(t * angle) / sinAngle;
+
+  return new THREE.Vector3(
+    a * p1.x + b * p2.x,
+    a * p1.y + b * p2.y,
+    a * p1.z + b * p2.z
+  );
+}
+
+/**
+ * Subdivise un segment en plusieurs points pour suivre la courbure de la Terre
+ * @param {number} lat1 - Latitude du point 1
+ * @param {number} lon1 - Longitude du point 1
+ * @param {number} lat2 - Latitude du point 2
+ * @param {number} lon2 - Longitude du point 2
+ * @param {number} radius - Rayon de la sphère
+ * @param {number} maxSegmentLength - Longueur maximale d'un segment en degrés
+ * @returns {Array<[number, number]>} - Tableau de coordonnées [lon, lat]
+ */
+export function subdivideSegment(lat1, lon1, lat2, lon2, radius = EARTH_RADIUS, maxSegmentLength = 5) {
+  const distance = geoDistance(lat1, lon1, lat2, lon2);
+
+  // Si le segment est assez court, pas de subdivision
+  if (distance <= maxSegmentLength) {
+    return [[lon1, lat1], [lon2, lat2]];
+  }
+
+  // Calculer le nombre de subdivisions nécessaires
+  const numSegments = Math.ceil(distance / maxSegmentLength);
+  const points = [];
+
+  for (let i = 0; i <= numSegments; i++) {
+    const t = i / numSegments;
+    const point = interpolateOnSphere(lat1, lon1, lat2, lon2, t, radius);
+
+    // Convertir le point 3D en lat/lon
+    const { lat, lon } = vector3ToLatLon(point);
+    points.push([lon, lat]);
+  }
+
+  return points;
+}
+
+/**
+ * Subdivise un anneau de polygone pour qu'il suive la courbure de la Terre
+ * @param {Array<[number, number]>} ring - Coordonnées [lon, lat]
+ * @param {number} radius - Rayon de la sphère
+ * @param {number} maxSegmentLength - Longueur maximale d'un segment
+ * @returns {Array<[number, number]>} - Ring subdivisé
+ */
+export function subdivideRing(ring, radius = EARTH_RADIUS, maxSegmentLength = 5) {
+  if (ring.length < 2) return ring;
+
+  const subdividedRing = [];
+
+  for (let i = 0; i < ring.length; i++) {
+    const [lon1, lat1] = ring[i];
+    const [lon2, lat2] = ring[(i + 1) % ring.length];
+
+    const segmentPoints = subdivideSegment(lat1, lon1, lat2, lon2, radius, maxSegmentLength);
+
+    // Ajouter tous les points sauf le dernier (qui sera le premier du segment suivant)
+    for (let j = 0; j < segmentPoints.length - 1; j++) {
+      subdividedRing.push(segmentPoints[j]);
+    }
+  }
+
+  return subdividedRing;
+}
+
+/**
  * Villes majeures avec coordonnées (points de départ potentiels)
  */
 export const MAJOR_CITIES = [

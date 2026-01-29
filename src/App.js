@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Scene } from './components';
 import { AlertIntro } from './components/AlertIntro';
 import { InfectionComplete } from './components/InfectionComplete';
+import { GeoJsonProvider } from './context/GeoJsonContext';
 import './App.css';
 
 const TOTAL_TIME = 5 * 60 * 1000; // 5 минут
@@ -45,21 +46,23 @@ function App() {
   }, []);
 
   return (
-    <div className="App">
-      {/* Вступительный экран ALERT */}
-      {!introComplete && (
-        <AlertIntro onComplete={() => setIntroComplete(true)} />
-      )}
+    <GeoJsonProvider>
+      <div className="App">
+        {/* Вступительный экран ALERT */}
+        {!introComplete && (
+          <AlertIntro onComplete={() => setIntroComplete(true)} />
+        )}
 
-      {/* Scène 3D avec la Terre et l'infection */}
-      <Scene
-        startAnimation={introComplete}
-        onInfectionComplete={handleInfectionComplete}
-      />
+        {/* Scène 3D avec la Terre et l'infection */}
+        <Scene
+          startAnimation={introComplete}
+          onInfectionComplete={handleInfectionComplete}
+        />
 
-      {/* Финальный экран - Планета заражена */}
-      <InfectionComplete visible={infectionComplete} />
-    </div>
+        {/* Финальный экран - Планета заражена */}
+        <InfectionComplete visible={infectionComplete} />
+      </div>
+    </GeoJsonProvider>
   );
 }
 

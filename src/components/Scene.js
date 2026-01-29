@@ -1,14 +1,14 @@
-import { Suspense, useState, useCallback, useRef, useEffect } from 'react';
+import { Suspense, useState, useCallback, useEffect, memo, useMemo } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Stars, Preload } from '@react-three/drei';
-import { Earth } from './Earth';
-import { Clouds } from './Clouds';
-import { Atmosphere } from './Atmosphere';
-import { NightLights } from './NightLights';
+// import { Earth } from './Earth';
+// import { Clouds } from './Clouds';
+// import { Atmosphere } from './Atmosphere';
+// import { NightLights } from './NightLights';
 import { CountryInfectionSystem, InfectionOrigin } from './infection';
 import { GeoJsonLayer, CountryNameDisplay, SORT_MODES } from './GeoJsonLayer';
 import { HolographicRings } from './HolographicRings';
-import { ScanLines } from './ScanLines';
+// import { ScanLines } from './ScanLines';
 import { OceanGridShader } from './OceanGrid';
 import { CameraAnimator } from './CameraAnimator';
 import { NewsTicker } from './NewsTicker';
@@ -27,10 +27,7 @@ import { InfectionHUD } from './InfectionHUD';
  *
  * Inclinaison de l'axe ~23.5° comme la vraie Terre
  */
-function EarthGroup({ onCountrySelect, showGeoJson = true, geoJsonSettings = {}, onStatsUpdate, startAnimation = true }) {
-  // Position du "Soleil" pour le calcul de l'éclairage des lumières nocturnes
-  const sunPosition = [5, 3, 5];
-
+const EarthGroup = memo(function EarthGroup({ onCountrySelect, showGeoJson = true, geoJsonSettings = {}, onStatsUpdate, startAnimation = true }) {
   // Paramètres par défaut pour la couche GeoJSON
   const defaultGeoJsonSettings = {
     geoJsonUrl: '/world.geojson',
@@ -106,7 +103,7 @@ function EarthGroup({ onCountrySelect, showGeoJson = true, geoJsonSettings = {},
       /> */}
     </group>
   );
-}
+});
 
 /**
  * Composant Lighting (Éclairage)
@@ -115,26 +112,18 @@ function EarthGroup({ onCountrySelect, showGeoJson = true, geoJsonSettings = {},
  * - Directional light = Soleil (source principale, projette des ombres)
  * - Ambient light = lumière diffuse (pour que le côté sombre ne soit pas noir)
  */
-function Lighting() {
+const Lighting = memo(function Lighting() {
   return (
     <>
       {/*
         Directional Light - simulation du Soleil
         - intensity : luminosité de la lumière
         - position : d'où elle éclaire (droite-haut-avant)
-        - castShadow : active la projection d'ombres
+        - Shadow mapping désactivé pour optimiser les performances (-16 MB GPU)
       */}
       <directionalLight
         intensity={1.5}
         position={[5, 3, 5]}
-        castShadow
-        shadow-mapSize-width={2048}
-        shadow-mapSize-height={2048}
-        shadow-camera-far={50}
-        shadow-camera-left={-10}
-        shadow-camera-right={10}
-        shadow-camera-top={10}
-        shadow-camera-bottom={-10}
       />
 
       {/*
@@ -152,7 +141,7 @@ function Lighting() {
       />
     </>
   );
-}
+});
 
 /**
  * Composant Scene (Scène)
@@ -188,6 +177,22 @@ export function Scene({
 
   // Статистика заражения для HUD
   const [infectionStats, setInfectionStats] = useState({ infected: 0, total: 200 });
+
+  // Mémoïser geoJsonSettings pour éviter de recréer l'objet à chaque render
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const memoizedGeoJsonSettings = useMemo(() => geoJsonSettings, [
+    geoJsonSettings.geoJsonUrl,
+    geoJsonSettings.sortMode,
+    geoJsonSettings.interactive,
+    geoJsonSettings.useModifierKey,
+    geoJsonSettings.defaultColor,
+    geoJsonSettings.selectedColor,
+    geoJsonSettings.defaultOpacity,
+    geoJsonSettings.selectedOpacity,
+    geoJsonSettings.dimmedOpacity,
+    geoJsonSettings.lineWidth,
+    geoJsonSettings.rotationSpeed,
+  ]);
 
   // Обработчик обновления статистики
   const handleStatsUpdate = useCallback((stats) => {
@@ -233,8 +238,7 @@ export function Scene({
           near: 0.1,             // Plan de découpe proche
           far: 1000,             // Plan de découpe éloigné
         }}
-        // Activer les ombres
-        shadows
+        // Shadows désactivés pour optimiser les performances
         // Paramètres du moteur de rendu WebGL
         gl={{
           antialias: true,           // Lissage des bords
@@ -264,7 +268,7 @@ export function Scene({
           <EarthGroup
             onCountrySelect={handleCountrySelect}
             showGeoJson={showGeoJson}
-            geoJsonSettings={geoJsonSettings}
+            geoJsonSettings={memoizedGeoJsonSettings}
             onStatsUpdate={handleStatsUpdate}
             startAnimation={startAnimation}
           />
@@ -277,11 +281,11 @@ export function Scene({
             tertiaryColor="#00ff88"
           />
 
-          {/* Fond étoilé */}
+          {/* Fond étoilé - optimisé à 10k étoiles */}
           <Stars
             radius={300}        // Rayon de la sphère d'étoiles
             depth={60}          // Profondeur de distribution
-            count={20000}       // Nombre d'étoiles
+            count={10000}       // Nombre d'étoiles (réduit de 20k pour performance)
             factor={7}          // Taille des étoiles
             saturation={0}      // Saturation (0 = blanches)
             fade                // Fondu sur les bords

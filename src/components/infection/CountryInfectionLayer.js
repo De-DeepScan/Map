@@ -2,7 +2,8 @@ import { useState, useEffect, useMemo, useRef, memo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import earcut from 'earcut';
-import { EARTH_RADIUS } from '../../utils/geoUtils';
+import { EARTH_RADIUS, subdivideRing } from '../../utils/geoUtils';
+import { useGeoJson } from '../../context/GeoJsonContext';
 
 /**
  * CountryInfectionLayer
@@ -52,16 +53,20 @@ function latLonTo3D(lat, lon, radius) {
 /**
  * Создание геометрии полигона страны с правильной триангуляцией
  * Использует earcut для корректной обработки вогнутых полигонов
+ * AMÉLIORÉ: Subdivise les segments pour suivre la courbure de la Terre
  */
 function createPolygonGeometry(coordinates, radius) {
   if (coordinates.length < 3) return null;
+
+  // Subdiviser pour suivre la courbure (améliore la forme sur la sphère)
+  const subdividedCoords = subdivideRing(coordinates, radius, 5);
 
   // Массив 2D координат для earcut (lat/lon)
   const flatCoords = [];
   // Массив 3D точек для геометрии
   const points3D = [];
 
-  coordinates.forEach(([lon, lat]) => {
+  subdividedCoords.forEach(([lon, lat]) => {
     // 2D для триангуляции
     flatCoords.push(lon, lat);
     // 3D для геометрии
@@ -92,15 +97,18 @@ export function CountryInfectionLayer({
   rotationSpeed = 0.001,
 }) {
   const groupRef = useRef();
+  const { geoData: contextGeoData } = useGeoJson();
   const [geoData, setGeoData] = useState(null);
+  const geometriesRef = useRef([]);
+  // Cache de géométries par pays pour éviter de recréer (OPTIMISATION CRITIQUE)
+  const geometryCacheRef = useRef(new Map());
 
-  // Загрузка GeoJSON
+  // Загрузка GeoJSON из Context
   useEffect(() => {
-    fetch(geoJsonUrl)
-      .then(response => response.json())
-      .then(data => setGeoData(data))
-      .catch(error => console.error('Error loading GeoJSON:', error));
-  }, [geoJsonUrl]);
+    if (contextGeoData) {
+      setGeoData(contextGeoData);
+    }
+  }, [contextGeoData]);
 
   // Ротация
   useFrame(() => {
@@ -109,7 +117,7 @@ export function CountryInfectionLayer({
     }
   });
 
-  // Создание мешей для заражённых стран
+  // Créer les géométries avec cache (OPTIMISATION ANTI-PLANTAGE)
   const infectedMeshes = useMemo(() => {
     if (!geoData || !geoData.features) return [];
 
@@ -134,7 +142,20 @@ export function CountryInfectionLayer({
 
       coordinateArrays.forEach((ring, ringIndex) => {
         if (ring.length > 2) {
-          const geom = createPolygonGeometry(ring, radius);
+          const cacheKey = `${countryName}-${ringIndex}`;
+
+          // Vérifier le cache avant de créer (ÉVITE RECRÉATION!)
+          let geom = geometryCacheRef.current.get(cacheKey);
+
+          if (!geom) {
+            // Créer seulement si pas dans le cache
+            geom = createPolygonGeometry(ring, radius);
+            if (geom) {
+              geometryCacheRef.current.set(cacheKey, geom);
+              geometriesRef.current.push(geom);
+            }
+          }
+
           if (geom) {
             meshes.push(
               <InfectedCountryMesh
@@ -151,6 +172,19 @@ export function CountryInfectionLayer({
 
     return meshes;
   }, [geoData, infectedCountries, color]);
+
+  // Cleanup: dispose all geometries and clear cache on unmount
+  useEffect(() => {
+    const geometries = geometriesRef.current;
+    const cache = geometryCacheRef.current;
+    return () => {
+      geometries.forEach(geom => {
+        if (geom) geom.dispose();
+      });
+      geometriesRef.current = [];
+      cache.clear();
+    };
+  }, []);
 
   return (
     <group ref={groupRef}>

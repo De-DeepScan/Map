@@ -197,7 +197,7 @@ export function InfectionOverlay({
 
   return (
     <mesh ref={meshRef}>
-      <sphereGeometry args={[EARTH_RADIUS + 0.005, 128, 64]} />
+      <sphereGeometry args={[EARTH_RADIUS + 0.005, 64, 32]} />
       <primitive object={material} ref={materialRef} attach="material" />
     </mesh>
   );
