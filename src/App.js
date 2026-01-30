@@ -1,65 +1,74 @@
-import { useState, useEffect, useCallback } from 'react';
 import { Scene } from './components';
 import { AlertIntro } from './components/AlertIntro';
 import { InfectionComplete } from './components/InfectionComplete';
+import { GameProvider, useGame, DebugPanel } from './gamemaster';
 import './App.css';
 
-const TOTAL_TIME = 5 * 60 * 1000; // 5 минут
-
 /**
- * Composant App
+ * GameContent
  *
- * Composant principal de l'application
- * Affiche la scène 3D avec la planète Terre et le système d'infection
+ * Contenu principal du jeu, utilise le contexte GameProvider
  */
-function App() {
-  const [introComplete, setIntroComplete] = useState(false);
-  const [infectionComplete, setInfectionComplete] = useState(false);
-  const [startTime, setStartTime] = useState(null);
+function GameContent() {
+  const {
+    introComplete,
+    infectionComplete,
+    showAlert,
+    gameKey,
+    onAlertComplete,
+    handleInfectionComplete,
+    setIntroComplete,
+  } = useGame();
 
-  // Запускаем таймер после intro
-  useEffect(() => {
-    if (introComplete && !startTime) {
-      setStartTime(Date.now());
+  // Gérer la fin de l'intro (soit au démarrage, soit après une commande show_alert)
+  const handleIntroComplete = () => {
+    if (showAlert) {
+      onAlertComplete();
+    } else {
+      setIntroComplete(true);
     }
-  }, [introComplete, startTime]);
-
-  // Проверяем прошло ли 5 минут
-  useEffect(() => {
-    if (!startTime || infectionComplete) return;
-
-    const timer = setInterval(() => {
-      const elapsed = Date.now() - startTime;
-      if (elapsed >= TOTAL_TIME) {
-        setInfectionComplete(true);
-        clearInterval(timer);
-      }
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [startTime, infectionComplete]);
-
-  // Callback для завершения заражения (вызывается из Scene)
-  const handleInfectionComplete = useCallback(() => {
-    setInfectionComplete(true);
-  }, []);
+  };
 
   return (
     <div className="App">
-      {/* Вступительный экран ALERT */}
-      {!introComplete && (
-        <AlertIntro onComplete={() => setIntroComplete(true)} />
+      {/* Écran d'intro ALERT - s'affiche au démarrage OU quand show_alert est déclenché */}
+      {(!introComplete || showAlert) && (
+        <AlertIntro onComplete={handleIntroComplete} />
       )}
 
       {/* Scène 3D avec la Terre et l'infection */}
       <Scene
-        startAnimation={introComplete}
+        key={gameKey}
+        startAnimation={introComplete && !showAlert}
         onInfectionComplete={handleInfectionComplete}
       />
 
-      {/* Финальный экран - Планета заражена */}
+      {/* Écran final - Planète infectée */}
       <InfectionComplete visible={infectionComplete} />
     </div>
+  );
+}
+
+/**
+ * App
+ *
+ * Composant principal de l'application
+ * Intégré avec le système gamemaster pour le contrôle à distance
+ *
+ * Commands disponibles via backoffice:
+ * - restart: Redémarrer le jeu
+ * - reset_timer: Réinitialiser le timer (payload.value = secondes)
+ * - set_timer: Définir le timer à une valeur spécifique
+ * - show_alert: Afficher l'écran ALERT
+ * - show_infected: Afficher l'écran "Planète Infectée"
+ * - hide_infected: Masquer l'écran "Planète Infectée"
+ */
+function App() {
+  return (
+    <GameProvider>
+      <GameContent />
+      <DebugPanel />
+    </GameProvider>
   );
 }
 

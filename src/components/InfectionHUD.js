@@ -1,39 +1,40 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 
 /**
  * InfectionHUD
  *
- * Панель с прогрессом заражения и обратным отсчётом
- * - Обратный отсчёт 5 минут
- * - Прогресс-бар заражения
- * - Digital стиль
+ * Panneau avec la progression de l'infection et le compte à rebours
+ * - Compte à rebours de 5 minutes
+ * - Barre de progression de l'infection
+ * - Style digital
  */
 
-const TOTAL_TIME = 5 * 60 * 1000; // 5 минут в миллисекундах
+const DEFAULT_TOTAL_TIME = 5 * 60 * 1000; // 5 minutes en millisecondes
 
 export function InfectionHUD({
   infectionProgress = 0,  // 0-100%
   startTime = null,
   totalCountries = 200,
   infectedCountries = 0,
+  totalTime = DEFAULT_TOTAL_TIME,  // Peut être redéfini depuis gamemaster
 }) {
-  const [timeLeft, setTimeLeft] = useState(TOTAL_TIME);
+  const [timeLeft, setTimeLeft] = useState(totalTime);
   const [displayProgress, setDisplayProgress] = useState(0);
 
-  // Обратный отсчёт
+  // Compte à rebours
   useEffect(() => {
     if (!startTime) return;
 
     const interval = setInterval(() => {
       const elapsed = Date.now() - startTime;
-      const remaining = Math.max(0, TOTAL_TIME - elapsed);
+      const remaining = Math.max(0, totalTime - elapsed);
       setTimeLeft(remaining);
     }, 100);
 
     return () => clearInterval(interval);
-  }, [startTime]);
+  }, [startTime, totalTime]);
 
-  // Плавная анимация прогресса
+  // Animation fluide de la progression
   useEffect(() => {
     const targetProgress = Math.min(100, (infectedCountries / totalCountries) * 100);
 
@@ -49,7 +50,7 @@ export function InfectionHUD({
     return () => clearInterval(interval);
   }, [infectedCountries, totalCountries]);
 
-  // Форматирование времени
+  // Formatage du temps
   const formatTime = (ms) => {
     const totalSeconds = Math.ceil(ms / 1000);
     const minutes = Math.floor(totalSeconds / 60);
@@ -57,7 +58,7 @@ export function InfectionHUD({
     return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   };
 
-  // Цвет прогресса в зависимости от уровня
+  // Couleur de progression selon le niveau
   const getProgressColor = () => {
     if (displayProgress < 30) return '#00ff00';
     if (displayProgress < 60) return '#ffff00';
@@ -75,7 +76,7 @@ export function InfectionHUD({
       zIndex: 100,
       fontFamily: '"Courier New", "Consolas", monospace',
     }}>
-      {/* Контейнер HUD */}
+      {/* Conteneur HUD */}
       <div style={{
         backgroundColor: 'rgba(0, 10, 20, 0.9)',
         border: '1px solid #00ffff',
@@ -83,7 +84,7 @@ export function InfectionHUD({
         minWidth: '280px',
         boxShadow: '0 0 20px rgba(0, 255, 255, 0.3), inset 0 0 30px rgba(0, 255, 255, 0.05)',
       }}>
-        {/* Заголовок */}
+        {/* En-tête */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
@@ -110,7 +111,7 @@ export function InfectionHUD({
           </span>
         </div>
 
-        {/* Таймер обратного отсчёта */}
+        {/* Timer compte à rebours */}
         <div style={{
           display: 'flex',
           justifyContent: 'space-between',
@@ -137,7 +138,7 @@ export function InfectionHUD({
           </span>
         </div>
 
-        {/* Прогресс-бар */}
+        {/* Barre de progression */}
         <div style={{ marginBottom: '10px' }}>
           <div style={{
             display: 'flex',
@@ -162,7 +163,7 @@ export function InfectionHUD({
             </span>
           </div>
 
-          {/* Полоса прогресса */}
+          {/* Barre de progression */}
           <div style={{
             height: '20px',
             backgroundColor: 'rgba(0, 20, 40, 0.8)',
@@ -170,7 +171,7 @@ export function InfectionHUD({
             position: 'relative',
             overflow: 'hidden',
           }}>
-            {/* Заполнение */}
+            {/* Remplissage */}
             <div style={{
               position: 'absolute',
               top: 0,
@@ -182,7 +183,7 @@ export function InfectionHUD({
               transition: 'width 0.3s ease-out',
             }} />
 
-            {/* Сканлайны */}
+            {/* Lignes de scan */}
             <div style={{
               position: 'absolute',
               top: 0,
@@ -193,7 +194,7 @@ export function InfectionHUD({
               pointerEvents: 'none',
             }} />
 
-            {/* Анимированная линия */}
+            {/* Ligne animée */}
             <div style={{
               position: 'absolute',
               top: 0,
@@ -207,7 +208,7 @@ export function InfectionHUD({
           </div>
         </div>
 
-        {/* Статистика */}
+        {/* Statistiques */}
         <div style={{
           display: 'flex',
           justifyContent: 'space-between',
@@ -260,7 +261,7 @@ export function InfectionHUD({
         </div>
       </div>
 
-      {/* CSS анимации */}
+      {/* Animations CSS */}
       <style>{`
         @keyframes hud-blink {
           0%, 100% { opacity: 1; }
