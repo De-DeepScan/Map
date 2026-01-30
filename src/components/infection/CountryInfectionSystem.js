@@ -1,22 +1,22 @@
 import { useEffect, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { CountryInfectionLayer } from './CountryInfectionLayer';
-import { useCountryInfection } from '../../hooks/useCountryInfection';
+import { TransmissionArcsManager } from './TransmissionArcsManager';
+import { usePlagueInfection } from '../../hooks/usePlagueInfection';
 
 /**
  * CountryInfectionSystem
  *
- * Полная система заражения по странам:
- * - Заражение в пределах границ стран
- * - Распространение на все страны
- * - Контролируемая скорость
+ * Systeme d'infection style Plague Inc.:
+ * - Arcs de transmission (une seule ligne par paire de pays)
+ * - Infection qui se propage depuis le point d'arrivee
+ * - Duree totale: ~5 minutes
  */
 export function CountryInfectionSystem({
   autoStart = false,
   startCountry = 'France',
-  spreadInterval = 2000,        // 2 секунды между заражениями
-  infectionDuration = 3000,     // 3 секунды на заражение страны
   color = '#ff0000',
+  arcColor = '#ff3333',
   rotationSpeed = 0.001,
   onStatsUpdate,
 }) {
@@ -24,32 +24,35 @@ export function CountryInfectionSystem({
 
   const {
     infectedCountries,
+    transmissions,
     stats,
     geoDataLoaded,
     startInfection,
     isRunning,
-  } = useCountryInfection({
-    spreadInterval,
-    infectionDuration,
-    maxInfectedCountries: 200,
-    neighborDistance: 30,
+    getCountryCentroid,
+  } = usePlagueInfection({
+    neighborSpreadInterval: 1500,
+    neighborSpreadThreshold: 1.0,    // Seulement quand completement infecte
+    infectionSpeed: 0.00003,         // 3x plus lent
+    longDistanceInterval: 30000,
+    longDistanceProbability: 0.15,
   });
 
-  // Автозапуск
+  // Autostart
   useEffect(() => {
     if (autoStart && geoDataLoaded && !isRunning) {
       startInfection(startCountry);
     }
   }, [autoStart, geoDataLoaded, isRunning, startCountry, startInfection]);
 
-  // Обновление статистики
+  // Stats update
   useEffect(() => {
     if (onStatsUpdate) {
       onStatsUpdate(stats);
     }
   }, [stats, onStatsUpdate]);
 
-  // Ротация
+  // Rotation
   useFrame(() => {
     if (groupRef.current && rotationSpeed) {
       groupRef.current.rotation.y += rotationSpeed;
@@ -58,10 +61,19 @@ export function CountryInfectionSystem({
 
   return (
     <group ref={groupRef}>
+      {/* Couche d'infection des pays (propagation depuis point d'entree) */}
       <CountryInfectionLayer
         infectedCountries={infectedCountries}
         color={color}
         rotationSpeed={0}
+      />
+
+      {/* Arcs de transmission (une seule ligne par paire) */}
+      <TransmissionArcsManager
+        activeTransmissions={transmissions}
+        getCountryCentroid={getCountryCentroid}
+        color={arcColor}
+        longDistanceColor="#ff6644"
       />
     </group>
   );
