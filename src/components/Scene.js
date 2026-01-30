@@ -10,6 +10,7 @@ import { GeoJsonLayer, CountryNameDisplay, SORT_MODES } from './GeoJsonLayer';
 import { HolographicRings } from './HolographicRings';
 // import { ScanLines } from './ScanLines';
 import { OceanGridShader } from './OceanGrid';
+import { BaseEarthSphere } from './BaseEarthSphere';
 import { CameraAnimator } from './CameraAnimator';
 import { NewsTicker } from './NewsTicker';
 import { InfectionHUD } from './InfectionHUD';
@@ -52,6 +53,14 @@ const EarthGroup = memo(function EarthGroup({ onCountrySelect, showGeoJson = tru
       {/* <Clouds rotationSpeed={0.0012} /> */}
       {/* <NightLights rotationSpeed={0.001} lightPosition={sunPosition} /> */}
       {/* <Atmosphere /> */}
+
+      {/* Sphère de base pour éviter les trous */}
+      <BaseEarthSphere
+        color="#0a0a15"
+        opacity={0.3}
+        rotationSpeed={0.001}
+        enabled={true}
+      />
 
       {/* Grille digitale sur les océans */}
       <OceanGridShader

@@ -30,6 +30,21 @@ export const SORT_MODES = {
 };
 
 /**
+ * Détecte si un anneau de coordonnées traverse l'antiméridien (±180°)
+ */
+function ringCrossesAntimeridian(ring) {
+  for (let i = 0; i < ring.length - 1; i++) {
+    const lon1 = ring[i][0];
+    const lon2 = ring[i + 1][0];
+    const dLon = Math.abs(lon2 - lon1);
+    if (dLon > 180) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Calcul approximatif de la superficie du polygone (pour le tri)
  */
 function calculateApproximateArea(coordinates) {
@@ -400,7 +415,8 @@ export function GeoJsonLayer({
       }
 
       coordinateArrays.forEach((ring, ringIndex) => {
-        if (ring.length > 2) {
+        // Ignorer les anneaux qui traversent l'antiméridien (évite les lignes verticales)
+        if (ring.length > 2 && !ringCrossesAntimeridian(ring)) {
           const isSelected = selectedCountry === countryName;
           const hasSelection = selectedCountry !== null;
 

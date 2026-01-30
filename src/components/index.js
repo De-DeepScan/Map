@@ -3,6 +3,7 @@ export { Clouds } from './Clouds';
 export { Atmosphere } from './Atmosphere';
 export { NightLights } from './NightLights';
 export { Scene } from './Scene';
+export { BaseEarthSphere } from './BaseEarthSphere';
 
 // GeoJSON Layer - слой с границами стран
 export {

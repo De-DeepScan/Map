@@ -61,10 +61,16 @@ export function randomNearbyPosition(lat, lon, maxDistance = 15) {
 
 /**
  * Calcule la distance entre deux points (en degrés approximatifs)
+ * Gère correctement le passage par l'antiméridien (±180°)
  */
 export function geoDistance(lat1, lon1, lat2, lon2) {
   const dLat = lat2 - lat1;
-  const dLon = lon2 - lon1;
+  let dLon = lon2 - lon1;
+
+  // Correction pour l'antiméridien: normaliser dLon entre -180 et 180
+  if (dLon > 180) dLon -= 360;
+  if (dLon < -180) dLon += 360;
+
   return Math.sqrt(dLat * dLat + dLon * dLon);
 }
 

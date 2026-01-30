@@ -213,7 +213,7 @@ export function OceanGridShader({
         }
       `,
       transparent: true,
-      side: THREE.FrontSide,
+      side: THREE.DoubleSide,
       depthTest: true,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
