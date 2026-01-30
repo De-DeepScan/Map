@@ -10,7 +10,7 @@ import { usePlagueInfection } from '../../hooks/usePlagueInfection';
  * Systeme d'infection style Plague Inc.:
  * - Arcs de transmission (une seule ligne par paire de pays)
  * - Infection qui se propage depuis le point d'arrivee
- * - Duree totale: ~5 minutes
+ * - Duree totale configurable (defaut: 5 minutes)
  */
 export function CountryInfectionSystem({
   autoStart = false,
@@ -18,6 +18,7 @@ export function CountryInfectionSystem({
   color = '#ff0000',
   arcColor = '#ff3333',
   rotationSpeed = 0.001,
+  totalInfectionTime = 300000,  // 5 minutes par defaut (en ms)
   onStatsUpdate,
 }) {
   const groupRef = useRef();
@@ -31,11 +32,12 @@ export function CountryInfectionSystem({
     isRunning,
     getCountryCentroid,
   } = usePlagueInfection({
-    neighborSpreadInterval: 1500,
-    neighborSpreadThreshold: 1.0,    // Seulement quand completement infecte
-    infectionSpeed: 0.00003,         // 3x plus lent
-    longDistanceInterval: 30000,
-    longDistanceProbability: 0.15,
+    totalInfectionTime,
+    neighborSpreadInterval: 800,
+    neighborSpreadThreshold: 0.5,
+    maxSpreadPerInterval: 3,
+    longDistanceInterval: 12000,
+    longDistanceProbability: 0.4,
   });
 
   // Autostart

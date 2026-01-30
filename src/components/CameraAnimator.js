@@ -11,8 +11,8 @@ import * as THREE from 'three';
  * - S'arrête quand toute la planète est visible
  */
 export function CameraAnimator({
-  startLat = 46.6,        // Latitude de départ (France)
-  startLon = 2.3,         // Longitude de départ (France)
+  startLat = 200,        // Latitude de départ (France)
+  startLon = 20,         // Longitude de départ (France)
   startDistance = 3.2,    // Distance initiale (proche)
   endDistance = 6,        // Distance finale (vue globale)
   duration = 8000,        // Durée de l'animation en ms

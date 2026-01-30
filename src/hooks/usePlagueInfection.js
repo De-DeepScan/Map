@@ -10,17 +10,26 @@ import { useGeoJson } from '../context/GeoJsonContext';
  * - Propagation aux voisins avec une seule ligne par paire
  * - Sauts longue distance (style avion)
  * - Point d'entree pour chaque pays (pour propagation depuis ce point)
+ * - Calibre pour infecter toute la planete dans le temps defini
  */
 export function usePlagueInfection(config = {}) {
   const {
-    neighborSpreadThreshold = 1.0,    // 100% = propagation seulement quand completement infecte
-    neighborSpreadInterval = 1500,    // ~1 pays par 1.5s = 200 pays en 5 min
-    infectionSpeed = 0.0004,          // Vitesse de propagation dans un pays
-    longDistanceInterval = 30000,     // Saut longue distance toutes les 30s
-    longDistanceProbability = 0.15,   // 15% chance (rare)
-    longDistanceMinDistance = 60,     // Distance min pour saut (degres)
+    totalInfectionTime = 300000,      // Temps total pour infecter la planete (5 min par defaut)
+    neighborSpreadThreshold = 0.5,    // 50% = propagation quand a moitie infecte
+    neighborSpreadInterval = 800,     // Intervalle de check pour propagation
+    maxSpreadPerInterval = 3,         // Nombre max de pays infectes par intervalle
+    longDistanceInterval = 12000,     // Saut longue distance toutes les 12s
+    longDistanceProbability = 0.4,    // 40% chance
+    longDistanceMinDistance = 50,     // Distance min pour saut (degres)
     neighborDistance = 30,            // Distance max pour voisins (degres)
   } = config;
+
+  // Calcul dynamique de la vitesse d'infection
+  // On veut ~8 generations pour couvrir 200 pays (2^8 = 256)
+  // Chaque generation: temps infection interne + delai trait (~3s)
+  // Temps par generation = totalTime / 10 (avec marge)
+  const timePerGeneration = totalInfectionTime / 12;
+  const infectionSpeed = 1.0 / (timePerGeneration - 3000); // progress/ms
 
   const { geoData: contextGeoData } = useGeoJson();
 
@@ -45,6 +54,7 @@ export function usePlagueInfection(config = {}) {
   const progressTimerRef = useRef(null);
   const neighborSpreadTimerRef = useRef(null);
   const longDistanceTimerRef = useRef(null);
+  const infectionStartTimeRef = useRef(null);
 
   // Chargement GeoJSON
   useEffect(() => {
@@ -66,6 +76,12 @@ export function usePlagueInfection(config = {}) {
     progressTimerRef.current = setInterval(() => {
       const now = Date.now();
 
+      // Calculer le multiplicateur de vitesse base sur le temps global
+      const globalElapsed = infectionStartTimeRef.current ? now - infectionStartTimeRef.current : 0;
+      const timeRatio = Math.min(1, globalElapsed / totalInfectionTime);
+      // Commence a 0.5x, finit a 2x (acceleration progressive)
+      const speedMultiplier = 0.5 + Math.pow(timeRatio, 1.5) * 1.5;
+
       setInfectedCountries(prev => {
         const updated = { ...prev };
         let changed = false;
@@ -74,7 +90,10 @@ export function usePlagueInfection(config = {}) {
           const country = updated[countryName];
           if (country.progress < 1) {
             const elapsed = now - country.startTime;
-            const newProgress = Math.min(1, elapsed * infectionSpeed);
+            // Ne pas commencer avant que le trait arrive (elapsed < 0)
+            if (elapsed < 0) return;
+
+            const newProgress = Math.min(1, elapsed * infectionSpeed * speedMultiplier);
 
             if (newProgress !== country.progress) {
               updated[countryName] = {
@@ -95,14 +114,14 @@ export function usePlagueInfection(config = {}) {
         clearInterval(progressTimerRef.current);
       }
     };
-  }, [isRunning, infectionSpeed]);
+  }, [isRunning, infectionSpeed, totalInfectionTime]);
 
   // Fonction pour creer une cle unique pour une paire de pays
   const getPairKey = (country1, country2) => {
     return [country1, country2].sort().join('-');
   };
 
-  // === PROPAGATION AUX VOISINS ===
+  // === PROPAGATION AUX VOISINS (MULTIPLE SIMULTANÉE) ===
   useEffect(() => {
     if (!isRunning || !geoDataLoaded) return;
 
@@ -110,56 +129,83 @@ export function usePlagueInfection(config = {}) {
       setInfectedCountries(prev => {
         const updated = { ...prev };
         const now = Date.now();
+        const newTransmissions = [];
+        let spreadCount = 0;
 
-        // Pays assez infectes pour propager (>= 60%)
+        const totalCountries = countries.length;
+        const infectedCount = Object.keys(prev).length;
+        const remainingCountries = totalCountries - infectedCount;
+
+        if (remainingCountries <= 0) return prev;
+
+        // Temps ecoule (ratio 0 -> 1)
+        const elapsedTime = infectionStartTimeRef.current ? now - infectionStartTimeRef.current : 0;
+        const timeRatio = Math.min(1, elapsedTime / totalInfectionTime);
+
+        // Acceleration progressive: commence a 1, finit a maxSpreadPerInterval * 2
+        // Courbe exponentielle douce: lent au debut, rapide a la fin
+        const accelerationCurve = Math.pow(timeRatio, 2); // Courbe quadratique
+        const dynamicMaxSpread = Math.max(1, Math.floor(1 + accelerationCurve * (maxSpreadPerInterval * 2 - 1)));
+
+        // Pays assez infectes pour propager
         const readyToSpread = Object.keys(prev).filter(name => {
           return prev[name].progress >= neighborSpreadThreshold;
         });
 
         if (readyToSpread.length === 0) return prev;
 
-        // Choisir UNE seule source aleatoire
-        const sourceName = readyToSpread[Math.floor(Math.random() * readyToSpread.length)];
-        const sourceNeighbors = neighbors[sourceName] || [];
-        const sourceCountry = countries.find(c => c.name === sourceName);
+        // Melanger les sources pour variete
+        const shuffledSources = [...readyToSpread].sort(() => Math.random() - 0.5);
 
-        // Filtrer les voisins non infectes ET sans ligne existante
-        const uninfected = sourceNeighbors.filter(n => {
-          if (updated[n.name]) return false;
-          const pairKey = getPairKey(sourceName, n.name);
-          return !connectedPairsRef.current.has(pairKey);
-        });
+        // Chaque source peut propager a UN voisin (jusqu'a dynamicMaxSpread au total)
+        for (const sourceName of shuffledSources) {
+          if (spreadCount >= dynamicMaxSpread) break;
 
-        if (uninfected.length > 0 && sourceCountry) {
-          const randomIdx = Math.floor(Math.random() * uninfected.length);
-          const target = uninfected[randomIdx];
-          const targetCountry = countries.find(c => c.name === target.name);
+          const sourceNeighbors = neighbors[sourceName] || [];
+          const sourceCountry = countries.find(c => c.name === sourceName);
 
-          if (targetCountry) {
-            // Marquer la paire comme connectee
-            const pairKey = getPairKey(sourceName, target.name);
-            connectedPairsRef.current.add(pairKey);
+          // Filtrer les voisins non infectes ET sans ligne existante
+          const uninfected = sourceNeighbors.filter(n => {
+            if (updated[n.name]) return false;
+            const pairKey = getPairKey(sourceName, n.name);
+            return !connectedPairsRef.current.has(pairKey);
+          });
 
-            // Point d'entree = centroid du pays cible (la ou le trait arrive)
-            // Delai = duree du trait (2.5s pour voisins)
-            updated[target.name] = {
-              centroid: targetCountry.centroid,
-              progress: 0,
-              startTime: now + 2500,
-              entryPoint: targetCountry.centroid,
-            };
+          if (uninfected.length > 0 && sourceCountry) {
+            const randomIdx = Math.floor(Math.random() * uninfected.length);
+            const target = uninfected[randomIdx];
+            const targetCountry = countries.find(c => c.name === target.name);
 
-            // Ajouter la transmission
-            setTransmissions(trans => [...trans, {
-              id: pairKey,
-              from: sourceName,
-              to: target.name,
-              isLongDistance: false,
-            }]);
+            if (targetCountry) {
+              // Marquer la paire comme connectee
+              const pairKey = getPairKey(sourceName, target.name);
+              connectedPairsRef.current.add(pairKey);
 
-            setStats(s => ({ ...s, infected: Object.keys(updated).length }));
-            return updated;
+              // Point d'entree = centroid du pays cible (la ou le trait arrive)
+              // Delai = duree du trait (2.5s pour voisins)
+              updated[target.name] = {
+                centroid: targetCountry.centroid,
+                progress: 0,
+                startTime: now + 2500,
+                entryPoint: targetCountry.centroid,
+              };
+
+              newTransmissions.push({
+                id: pairKey,
+                from: sourceName,
+                to: target.name,
+                isLongDistance: false,
+              });
+
+              spreadCount++;
+            }
           }
+        }
+
+        if (newTransmissions.length > 0) {
+          setTransmissions(trans => [...trans, ...newTransmissions]);
+          setStats(s => ({ ...s, infected: Object.keys(updated).length }));
+          return updated;
         }
 
         return prev;
@@ -171,7 +217,7 @@ export function usePlagueInfection(config = {}) {
         clearInterval(neighborSpreadTimerRef.current);
       }
     };
-  }, [isRunning, geoDataLoaded, neighbors, countries, neighborSpreadInterval, neighborSpreadThreshold]);
+  }, [isRunning, geoDataLoaded, neighbors, countries, neighborSpreadInterval, neighborSpreadThreshold, maxSpreadPerInterval, totalInfectionTime]);
 
   // === SAUTS LONGUE DISTANCE ===
   useEffect(() => {
@@ -180,18 +226,33 @@ export function usePlagueInfection(config = {}) {
     longDistanceTimerRef.current = setInterval(() => {
       setInfectedCountries(prev => {
         const infectedNames = Object.keys(prev);
-        if (infectedNames.length < 3) return prev;
+        if (infectedNames.length < 2) return prev;
 
-        // Sources eligibles: pays completement infectes (100%)
+        const now = Date.now();
+        const totalCountries = countries.length;
+        const infectedCount = infectedNames.length;
+        const remainingCountries = totalCountries - infectedCount;
+
+        if (remainingCountries <= 0) return prev;
+
+        // Acceleration progressive basee sur le temps ecoule
+        const elapsedTime = infectionStartTimeRef.current ? now - infectionStartTimeRef.current : 0;
+        const timeRatio = Math.min(1, elapsedTime / totalInfectionTime);
+
+        // Probabilite augmente avec le temps (commence faible, finit haute)
+        const accelerationCurve = Math.pow(timeRatio, 1.5);
+        const effectiveProbability = longDistanceProbability * 0.3 + accelerationCurve * longDistanceProbability * 1.5;
+
+        // Seuil de progression diminue avec le temps (plus facile de propager vers la fin)
+        const minProgress = 0.8 - (accelerationCurve * 0.4); // 0.8 -> 0.4
         const sources = infectedNames.filter(
-          name => prev[name].progress >= 1.0
+          name => prev[name].progress >= minProgress
         );
 
         if (sources.length === 0) return prev;
-        if (Math.random() > longDistanceProbability) return prev;
+        if (Math.random() > effectiveProbability) return prev;
 
         const updated = { ...prev };
-        const now = Date.now();
 
         const sourceName = sources[Math.floor(Math.random() * sources.length)];
         const sourceCountry = countries.find(c => c.name === sourceName);
@@ -245,7 +306,7 @@ export function usePlagueInfection(config = {}) {
         clearInterval(longDistanceTimerRef.current);
       }
     };
-  }, [isRunning, geoDataLoaded, countries, longDistanceInterval, longDistanceProbability, longDistanceMinDistance]);
+  }, [isRunning, geoDataLoaded, countries, longDistanceInterval, longDistanceProbability, longDistanceMinDistance, totalInfectionTime]);
 
   // Demarrer l'infection
   const startInfection = useCallback((countryName) => {
@@ -267,6 +328,7 @@ export function usePlagueInfection(config = {}) {
 
     if (country) {
       connectedPairsRef.current.clear();
+      infectionStartTimeRef.current = Date.now();
 
       setInfectedCountries({
         [country.name]: {

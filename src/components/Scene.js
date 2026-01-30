@@ -28,7 +28,7 @@ import { InfectionHUD } from './InfectionHUD';
  *
  * Inclinaison de l'axe ~23.5° comme la vraie Terre
  */
-const EarthGroup = memo(function EarthGroup({ onCountrySelect, showGeoJson = true, geoJsonSettings = {}, onStatsUpdate, startAnimation = true }) {
+const EarthGroup = memo(function EarthGroup({ onCountrySelect, showGeoJson = true, geoJsonSettings = {}, onStatsUpdate, startAnimation = true, totalInfectionTime = 300000 }) {
   // Paramètres par défaut pour la couche GeoJSON
   const defaultGeoJsonSettings = {
     geoJsonUrl: '/world.geojson',
@@ -91,13 +91,11 @@ const EarthGroup = memo(function EarthGroup({ onCountrySelect, showGeoJson = tru
         rotationSpeed={0.001}
       />
 
-      {/* Система заражения по странам (в пределах границ) */}
-      {/* 5 минут - заражение ускоряется по мере распространения */}
+      {/* Système d'infection des pays - calibré pour le temps total */}
       <CountryInfectionSystem
         autoStart={startAnimation}
         startCountry="France"
-        spreadInterval={1200}       // 1.2 секунды между волнами (несколько стран за раз)
-        infectionDuration={1500}    // 1.5 секунды на заполнение страны
+        totalInfectionTime={totalInfectionTime}
         color="#ff0000"
         rotationSpeed={0.001}
         onStatsUpdate={onStatsUpdate}
@@ -170,6 +168,7 @@ export function Scene({
   onCountrySelect: externalOnCountrySelect = null,
   startAnimation = true,
   onInfectionComplete = null,
+  totalInfectionTime = 300000,  // 5 minutes par défaut
 }) {
   // État du pays sélectionné
   const [selectedCountry, setSelectedCountry] = useState(null);
@@ -261,8 +260,8 @@ export function Scene({
         <Suspense fallback={null}>
           {/* Animation de la caméra: zoom depuis Paris puis vue globale */}
           <CameraAnimator
-            startLat={48.9}         // Paris
-            startLon={2.3}
+            startLat={65}           // Plus haut (Europe du Nord)
+            startLon={35}           // Plus à droite (Europe centrale)
             startDistance={3.2}     // Proche au début
             endDistance={6}         // Vue globale à la fin
             duration={20000}        // 20 секунд анимации
@@ -280,6 +279,7 @@ export function Scene({
             geoJsonSettings={memoizedGeoJsonSettings}
             onStatsUpdate={handleStatsUpdate}
             startAnimation={startAnimation}
+            totalInfectionTime={totalInfectionTime}
           />
 
           {/* Anneaux holographiques de données - en dehors du groupe Terre pour une rotation indépendante */}

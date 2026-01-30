@@ -57,6 +57,7 @@ function App() {
         <Scene
           startAnimation={introComplete}
           onInfectionComplete={handleInfectionComplete}
+          totalInfectionTime={TOTAL_TIME}
         />
 
         {/* Финальный экран - Планета заражена */}
