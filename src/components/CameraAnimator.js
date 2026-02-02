@@ -40,6 +40,10 @@ export function CameraAnimator({
   useEffect(() => {
     if (!enabled) return;
 
+    // Reset animation state pour permettre une nouvelle animation
+    startTime.current = null;
+    isAnimating.current = true;
+
     const startPos = latLonToPosition(startLat, startLon, startDistance);
     initialPosition.current = startPos.clone();
     camera.position.copy(startPos);

@@ -314,7 +314,7 @@ export function HolographicRings({
 
       {/* Symboles flottants sur le premier anneau */}
       <FloatingSymbols
-        count={25}
+        count={10}
         radius={earthRadius + 0.85}
         color={primaryColor}
         speed={0.3}
@@ -323,7 +323,7 @@ export function HolographicRings({
 
       {/* Symboles flottants sur le deuxieme anneau */}
       <FloatingSymbols
-        count={20}
+        count={8}
         radius={earthRadius + 1.05}
         color={secondaryColor}
         speed={-0.4}

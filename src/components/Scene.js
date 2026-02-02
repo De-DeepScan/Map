@@ -168,7 +168,8 @@ export function Scene({
   showGeoJson = true,
   geoJsonSettings = {},
   onCountrySelect: externalOnCountrySelect = null,
-  startAnimation = true,
+  startAnimation = true,        // Demarrer l'infection
+  startCameraAnimation = false, // Demarrer l'animation de camera (dezoom)
   onInfectionComplete = null,
   totalInfectionTime = 300000,  // 5 minutes par défaut
   enableHandTracking = true,    // Activer le hand tracking
@@ -250,8 +251,8 @@ export function Scene({
         <NewsTicker startTime={infectionStartTime} isRunning={true} />
       )}
 
-      {/* Hand tracking overlay - apercu camera et detection des gestes */}
-      {enableHandTracking && startAnimation && (
+      {/* Hand tracking overlay - toujours actif */}
+      {enableHandTracking && (
         <HandTrackingOverlay
           enabled={enableHandTracking}
           onRotationChange={setHandRotationDelta}
@@ -262,10 +263,10 @@ export function Scene({
       <Canvas
         // Paramètres de la caméra (position initiale sera changée par CameraAnimator)
         camera={{
-          position: [0, 0, 3.2], // Commence proche (sera animé)
-          fov: 45,               // Angle de vue (field of view)
-          near: 0.1,             // Plan de découpe proche
-          far: 1000,             // Plan de découpe éloigné
+          position: [0, 0, 6], // Commence loin (vue globale)
+          fov: 45,              // Angle de vue (field of view)
+          near: 0.1,            // Plan de découpe proche
+          far: 1000,            // Plan de découpe éloigné
         }}
         // Shadows désactivés pour optimiser les performances
         // Paramètres du moteur de rendu WebGL
@@ -281,12 +282,12 @@ export function Scene({
         <Suspense fallback={null}>
           {/* Animation de la caméra: zoom depuis Paris puis vue globale */}
           <CameraAnimator
-            startLat={50}           // Plus haut (Europe du Nord)
-            startLon={75}           // Plus à droite (Europe centrale)
-            startDistance={3.2}     // Proche au début
-            endDistance={6}         // Vue globale à la fin
-            duration={20000}        // 20 секунд анимации
-            delay={500}             // Небольшая задержка после intro
+            startLat={30}           // France (latitude)
+            startLon={-178}         // France (longitude corrigée)
+            startDistance={3.5}     // Proche de la France
+            endDistance={6}         // Vue finale après animation
+            duration={15000}        // 15 secondes d'animation
+            delay={300}             // Petite pause avant zoom
             enabled={startAnimation}
           />
 
