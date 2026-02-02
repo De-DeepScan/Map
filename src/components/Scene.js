@@ -1,4 +1,4 @@
-import { Suspense, useState, useCallback, useEffect, memo, useMemo } from 'react';
+import { Suspense, useState, useCallback, useEffect, memo, useMemo, useRef } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Stars, Preload } from '@react-three/drei';
 // import { Earth } from './Earth';
@@ -14,6 +14,8 @@ import { BaseEarthSphere } from './BaseEarthSphere';
 import { CameraAnimator } from './CameraAnimator';
 import { NewsTicker } from './NewsTicker';
 import { InfectionHUD } from './InfectionHUD';
+import { HandTrackingOverlay } from './HandTrackingOverlay';
+import { HandRotationController } from './HandRotationController';
 
 /**
  * Composant EarthGroup (Groupe Terre)
@@ -62,12 +64,12 @@ const EarthGroup = memo(function EarthGroup({ onCountrySelect, showGeoJson = tru
         enabled={true}
       />
 
-      {/* Grille digitale sur les océans */}
+      {/* Grille digitale sur les océans - optimisée */}
       <OceanGridShader
         color="#00ddff"
         opacity={0.25}
-        gridSize={40}
-        lineWidth={0.012}
+        gridSize={25}
+        lineWidth={0.015}
         rotationSpeed={0.001}
         pulseSpeed={1.0}
         glowIntensity={1.2}
@@ -169,17 +171,27 @@ export function Scene({
   startAnimation = true,
   onInfectionComplete = null,
   totalInfectionTime = 300000,  // 5 minutes par défaut
+  enableHandTracking = true,    // Activer le hand tracking
 }) {
   // État du pays sélectionné
   const [selectedCountry, setSelectedCountry] = useState(null);
 
+  // Hand tracking - rotation delta
+  const [handRotationDelta, setHandRotationDelta] = useState(0);
+  const earthGroupRef = useRef();
+
   // Temps de démarrage de l'infection (обновляется когда startAnimation становится true)
   const [infectionStartTime, setInfectionStartTime] = useState(null);
+
+  // Chargement différé des éléments non essentiels (anneaux holographiques)
+  const [showDecorations, setShowDecorations] = useState(false);
 
   // Запускаем таймер когда анимация начинается
   useEffect(() => {
     if (startAnimation && !infectionStartTime) {
       setInfectionStartTime(Date.now());
+      // Charger les décorations après 1.5s pour accélérer l'affichage initial
+      setTimeout(() => setShowDecorations(true), 1500);
     }
   }, [startAnimation, infectionStartTime]);
 
@@ -238,6 +250,15 @@ export function Scene({
         <NewsTicker startTime={infectionStartTime} isRunning={true} />
       )}
 
+      {/* Hand tracking overlay - apercu camera et detection des gestes */}
+      {enableHandTracking && startAnimation && (
+        <HandTrackingOverlay
+          enabled={enableHandTracking}
+          onRotationChange={setHandRotationDelta}
+          sensitivity={2.5}
+        />
+      )}
+
       <Canvas
         // Paramètres de la caméra (position initiale sera changée par CameraAnimator)
         camera={{
@@ -260,8 +281,8 @@ export function Scene({
         <Suspense fallback={null}>
           {/* Animation de la caméra: zoom depuis Paris puis vue globale */}
           <CameraAnimator
-            startLat={65}           // Plus haut (Europe du Nord)
-            startLon={35}           // Plus à droite (Europe centrale)
+            startLat={50}           // Plus haut (Europe du Nord)
+            startLon={75}           // Plus à droite (Europe centrale)
             startDistance={3.2}     // Proche au début
             endDistance={6}         // Vue globale à la fin
             duration={20000}        // 20 секунд анимации
@@ -272,33 +293,44 @@ export function Scene({
           {/* Éclairage de la scène */}
           <Lighting />
 
+          {/* Controleur de rotation par gestes de la main */}
+          <HandRotationController
+            targetRef={earthGroupRef}
+            rotationDelta={handRotationDelta}
+            enabled={enableHandTracking}
+          />
+
           {/* Planète Terre avec toutes ses couches */}
-          <EarthGroup
-            onCountrySelect={handleCountrySelect}
-            showGeoJson={showGeoJson}
-            geoJsonSettings={memoizedGeoJsonSettings}
-            onStatsUpdate={handleStatsUpdate}
-            startAnimation={startAnimation}
-            totalInfectionTime={totalInfectionTime}
-          />
+          <group ref={earthGroupRef}>
+            <EarthGroup
+              onCountrySelect={handleCountrySelect}
+              showGeoJson={showGeoJson}
+              geoJsonSettings={memoizedGeoJsonSettings}
+              onStatsUpdate={handleStatsUpdate}
+              startAnimation={startAnimation}
+              totalInfectionTime={totalInfectionTime}
+            />
+          </group>
 
-          {/* Anneaux holographiques de données - en dehors du groupe Terre pour une rotation indépendante */}
-          <HolographicRings
-            earthRadius={2}
-            primaryColor="#00ffff"
-            secondaryColor="#ff00ff"
-            tertiaryColor="#00ff88"
-          />
+          {/* Anneaux holographiques de données - chargement différé pour performance */}
+          {showDecorations && (
+            <HolographicRings
+              earthRadius={2}
+              primaryColor="#00ffff"
+              secondaryColor="#ff00ff"
+              tertiaryColor="#00ff88"
+            />
+          )}
 
-          {/* Fond étoilé - optimisé à 10k étoiles */}
+          {/* Fond étoilé - optimisé à 5k étoiles pour chargement rapide */}
           <Stars
             radius={300}        // Rayon de la sphère d'étoiles
-            depth={60}          // Profondeur de distribution
-            count={10000}       // Nombre d'étoiles (réduit de 20k pour performance)
-            factor={7}          // Taille des étoiles
+            depth={50}          // Profondeur de distribution
+            count={5000}        // Nombre d'étoiles (réduit pour performance)
+            factor={6}          // Taille des étoiles
             saturation={0}      // Saturation (0 = blanches)
             fade                // Fondu sur les bords
-            speed={0.5}         // Vitesse de scintillement
+            speed={0.3}         // Vitesse de scintillement
           />
 
           {/* Préchargement de toutes les textures */}

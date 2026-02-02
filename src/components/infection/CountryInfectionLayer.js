@@ -191,32 +191,31 @@ function createCountryShaderMaterial(countryIdTexture, infectionDataTexture, inf
 
       const float PI = 3.14159265359;
       const float MAX_SPREAD = 80.0;
+      const float GRID_SCALE = 2.5;  // Espacement de la grille
+      const float POINT_SIZE = 0.35;  // Taille des points
 
       // Fonction de bruit pseudo-aleatoire
       float hash(vec2 p) {
         return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
       }
 
-      // Bruit de Voronoi pour creer des points
-      float voronoi(vec2 p, float scale) {
+      // Grille hexagonale ordonnee
+      float hexGrid(vec2 p, float scale) {
         vec2 scaled = p * scale;
-        vec2 i = floor(scaled);
-        vec2 f = fract(scaled);
 
-        float minDist = 1.0;
+        // Decalage hexagonal: lignes paires vs impaires
+        float row = floor(scaled.y);
+        float xOffset = mod(row, 2.0) * 0.5;
 
-        for (int y = -1; y <= 1; y++) {
-          for (int x = -1; x <= 1; x++) {
-            vec2 neighbor = vec2(float(x), float(y));
-            vec2 point = hash(i + neighbor) * vec2(hash(i + neighbor + vec2(1.0, 0.0)));
-            point = 0.5 + 0.5 * sin(6.2831 * point);
-            vec2 diff = neighbor + point - f;
-            float dist = length(diff);
-            minDist = min(minDist, dist);
-          }
-        }
+        // Position dans la cellule
+        vec2 cell = vec2(scaled.x + xOffset, scaled.y);
+        vec2 cellId = floor(cell);
+        vec2 cellUV = fract(cell) - 0.5;
 
-        return minDist;
+        // Distance au centre de la cellule
+        float dist = length(cellUV);
+
+        return dist;
       }
 
       float geoDistance(float lat1, float lon1, float lat2, float lon2) {
@@ -260,17 +259,18 @@ function createCountryShaderMaterial(countryIdTexture, infectionDataTexture, inf
 
         float dist = geoDistance(latDeg, lonDeg, entryLat, entryLon);
 
-        vec2 noiseCoord = vec2(latDeg, lonDeg);
+        vec2 gridCoord = vec2(lonDeg, latDeg);
 
         // Distance normalisee (0 au point d'entree, 1 au bord max)
         float normalizedDist = dist / MAX_SPREAD;
 
-        // Creer des points avec Voronoi (espaces)
-        float pointPattern = voronoi(noiseCoord, 3.5);
-        float isPoint = step(pointPattern, 0.3); // Centre des cellules = points
+        // Creer des points avec grille hexagonale ordonnee
+        float pointPattern = hexGrid(gridCoord, GRID_SCALE);
+        float isPoint = 1.0 - step(POINT_SIZE, pointPattern); // Points au centre des cellules
 
-        // Petite variation aleatoire pour chaque point (+/- 5%)
-        float randomOffset = (hash(noiseCoord * 7.0) - 0.5) * 0.1;
+        // Legere variation pour l'apparition (basee sur la position de la cellule)
+        vec2 cellId = floor(gridCoord * GRID_SCALE);
+        float randomOffset = (hash(cellId) - 0.5) * 0.08;
 
         // Le point apparait quand progress depasse sa distance normalisee
         // Les points proches (normalizedDist petit) apparaissent en premier
@@ -380,7 +380,7 @@ export function CountryInfectionLayer({
   return (
     <group ref={groupRef}>
       <mesh>
-        <sphereGeometry args={[EARTH_RADIUS + 0.009, 128, 64]} />
+        <sphereGeometry args={[EARTH_RADIUS + 0.009, 96, 48]} />
         <primitive object={materialRef.current} attach="material" />
       </mesh>
       {countryBorders}
