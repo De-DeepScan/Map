@@ -24,8 +24,8 @@ export function InfectionRoute({
   const [arrived, setArrived] = useState(false);
   const startTime = useRef(null);
 
-  // Calculer les positions et la courbe
-  const { startPos, endPos, curve, points } = useMemo(() => {
+  // Calculer les points de la courbe
+  const points = useMemo(() => {
     const start = latLonToVector3(fromLat, fromLon, EARTH_RADIUS + 0.025);
     const end = latLonToVector3(toLat, toLon, EARTH_RADIUS + 0.025);
 
@@ -34,14 +34,7 @@ export function InfectionRoute({
     const arcHeight = Math.min(0.4, Math.max(0.12, distance * 0.12));
 
     const arc = createArcBetweenPoints(start, end, arcHeight);
-    const pts = arc.getPoints(80);
-
-    return {
-      startPos: start,
-      endPos: end,
-      curve: arc,
-      points: pts,
-    };
+    return arc.getPoints(80);
   }, [fromLat, fromLon, toLat, toLon]);
 
   // Materiau de la ligne - trainee qui reste visible

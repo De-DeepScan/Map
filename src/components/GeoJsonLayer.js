@@ -1,9 +1,12 @@
 
-import { useState, useEffect, useCallback, useMemo, memo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, memo, useRef, createContext, useContext } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { EARTH_RADIUS, subdivideRing } from '../utils/geoUtils';
 import { useGeoJson } from '../context/GeoJsonContext';
+
+// Contexte pour partager selectedCountry sans recréer les meshes
+const SelectionContext = createContext(null);
 
 /**
  * GeoJsonLayer - Couche de rendu des pays à partir de GeoJSON
@@ -109,8 +112,6 @@ const CountryMesh = memo(({
   countryName,
   ring,
   featureIndex,
-  isSelected,
-  hasSelection,
   isInteractive,
   onCountryClick,
   // Paramètres visuels
@@ -124,9 +125,14 @@ const CountryMesh = memo(({
   renderOrderBase,
   selectedRenderOrder,
 }) => {
-  const radius = EARTH_RADIUS + 0.01; // Légèrement au-dessus de la surface de la Terre
+  const radius = EARTH_RADIUS + 0.01;
   const lineRef = useRef();
   const materialRef = useRef();
+
+  // Utiliser le contexte pour la sélection (évite re-création des meshes)
+  const selectedCountry = useContext(SelectionContext);
+  const isSelected = selectedCountry === countryName;
+  const hasSelection = selectedCountry !== null;
 
   // Géométrie de la ligne de frontière - AMÉLIORÉE avec subdivision pour suivre la courbure
   const lineGeometry = useMemo(() => {
@@ -417,17 +423,12 @@ export function GeoJsonLayer({
       coordinateArrays.forEach((ring, ringIndex) => {
         // Ignorer les anneaux qui traversent l'antiméridien (évite les lignes verticales)
         if (ring.length > 2 && !ringCrossesAntimeridian(ring)) {
-          const isSelected = selectedCountry === countryName;
-          const hasSelection = selectedCountry !== null;
-
           meshes.push(
             <CountryMesh
               key={`country-${featureIndex}-${ringIndex}`}
               countryName={countryName}
               ring={ring}
               featureIndex={featureIndex}
-              isSelected={isSelected}
-              hasSelection={hasSelection}
               isInteractive={interactive && isModifierPressed}
               onCountryClick={handleCountryClick}
               defaultColor={defaultColor}
@@ -445,11 +446,11 @@ export function GeoJsonLayer({
     });
 
     return meshes;
+    // Note: selectedCountry retiré des dépendances - géré par chaque CountryMesh
   }, [
     geoData,
     sortMode,
     customSortFn,
-    selectedCountry,
     interactive,
     isModifierPressed,
     handleCountryClick,
@@ -464,9 +465,11 @@ export function GeoJsonLayer({
   ]);
 
   return (
-    <group ref={groupRef}>
-      {countryMeshes}
-    </group>
+    <SelectionContext.Provider value={selectedCountry}>
+      <group ref={groupRef}>
+        {countryMeshes}
+      </group>
+    </SelectionContext.Provider>
   );
 }
 

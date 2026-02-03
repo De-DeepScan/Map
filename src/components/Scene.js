@@ -1,14 +1,9 @@
 import { Suspense, useState, useCallback, useEffect, memo, useMemo, useRef } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Stars, Preload } from '@react-three/drei';
-// import { Earth } from './Earth';
-// import { Clouds } from './Clouds';
-// import { Atmosphere } from './Atmosphere';
-// import { NightLights } from './NightLights';
 import { CountryInfectionSystem, InfectionOrigin } from './infection';
 import { GeoJsonLayer, CountryNameDisplay, SORT_MODES } from './GeoJsonLayer';
 import { HolographicRings } from './HolographicRings';
-// import { ScanLines } from './ScanLines';
 import { OceanGridShader } from './OceanGrid';
 import { BaseEarthSphere } from './BaseEarthSphere';
 import { CameraAnimator } from './CameraAnimator';
@@ -50,13 +45,7 @@ const EarthGroup = memo(function EarthGroup({ onCountrySelect, showGeoJson = tru
   return (
     // Inclinaison de l'axe terrestre (23.5 degrés = 0.41 radian)
     <group rotation={[0, 0, 0.41]}>
-      {/* Composants de texture de la planète (désactivés) */}
-      {/* <Earth rotationSpeed={0.001} /> */}
-      {/* <Clouds rotationSpeed={0.0012} /> */}
-      {/* <NightLights rotationSpeed={0.001} lightPosition={sunPosition} /> */}
-      {/* <Atmosphere /> */}
-
-      {/* Sphère de base pour éviter les trous */}
+      {/* Sphère de base */}
       <BaseEarthSphere
         color="#0a0a15"
         opacity={0.3}
@@ -93,7 +82,7 @@ const EarthGroup = memo(function EarthGroup({ onCountrySelect, showGeoJson = tru
         rotationSpeed={0.001}
       />
 
-      {/* Système d'infection des pays - calibré pour le temps total */}
+      {/* Système d'infection des pays */}
       <CountryInfectionSystem
         autoStart={startAnimation}
         startCountry="France"
@@ -102,14 +91,6 @@ const EarthGroup = memo(function EarthGroup({ onCountrySelect, showGeoJson = tru
         rotationSpeed={0.001}
         onStatsUpdate={onStatsUpdate}
       />
-
-      {/* Lignes de scan - effet digital (désactivé) */}
-      {/* <ScanLines
-        earthRadius={2}
-        primaryColor="#00ffff"
-        secondaryColor="#00ff88"
-        enabled={true}
-      /> */}
     </group>
   );
 });
@@ -168,11 +149,10 @@ export function Scene({
   showGeoJson = true,
   geoJsonSettings = {},
   onCountrySelect: externalOnCountrySelect = null,
-  startAnimation = true,        // Demarrer l'infection
-  startCameraAnimation = false, // Demarrer l'animation de camera (dezoom)
+  startAnimation = true,
   onInfectionComplete = null,
-  totalInfectionTime = 300000,  // 5 minutes par défaut
-  enableHandTracking = true,    // Activer le hand tracking
+  totalInfectionTime = 300000,
+  enableHandTracking = true,
 }) {
   // État du pays sélectionné
   const [selectedCountry, setSelectedCountry] = useState(null);

@@ -58,8 +58,9 @@ function pointInPolygon(lon, lat, polygon) {
 }
 
 function generateCountryIdTexture(geoData) {
-  const width = 4096;
-  const height = 2048;
+  // Réduit de 4096x2048 à 2048x1024 pour optimiser le temps de génération
+  const width = 2048;
+  const height = 1024;
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;

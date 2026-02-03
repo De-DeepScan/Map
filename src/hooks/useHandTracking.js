@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision';
+import { FilesetResolver, HandLandmarker } from 'wZ';
 
 // Zone d'activation (centre de l'ecran, partie basse)
 const ACTIVATION_ZONE = {
@@ -15,9 +15,9 @@ const STABILIZATION_THRESHOLD = 0.03; // mouvement max pendant stabilisation
  * Hook useHandTracking
  *
  * Detecte les gestes de la main pour controler la rotation:
- * - Main ouverte dans la zone d'activation
- * - Stabilisation 0.5s pour activer le controle
- * - Swipe gauche/droite pour tourner
+ * - Main ouverte dans la zone d'activation = rotation
+ * - Poing ferme = STOP la rotation
+ * - Stabilisation 0.4s pour activer le controle
  */
 export function useHandTracking({ enabled = true, sensitivity = 2.0 } = {}) {
   const [isReady, setIsReady] = useState(false);
@@ -44,53 +44,121 @@ export function useHandTracking({ enabled = true, sensitivity = 2.0 } = {}) {
   const lastStablePositionRef = useRef(null);
   const controlActiveRef = useRef(false);
 
-  // Detecter si la main est un poing ferme
-  // On verifie que les bouts des doigts sont proches de la paume
+  // Refs pour throttler les mises à jour UI (optimisation)
+  const uiUpdateCounterRef = useRef(0);
+  const lastStabProgressRef = useRef(0);
+
+  // Ref pour lisser la detection du poing (evite les oscillations)
+  const fistScoreHistoryRef = useRef([]);
+  const FIST_HISTORY_SIZE = 5; // Nombre de frames pour lisser
+  const FIST_THRESHOLD = 0.6; // Seuil pour considerer comme poing (60%)
+
+  // Detecter si la main est un poing ferme avec score de confiance
+  // Utilise plusieurs metriques pour une detection plus robuste
   const detectFist = useCallback((landmarks) => {
     if (!landmarks || landmarks.length < 21) return false;
 
-    // Points cles:
-    // 0 = poignet, 9 = base du majeur (centre paume)
-    // 4 = bout du pouce, 8 = bout de l'index, 12 = bout du majeur
-    // 16 = bout de l'annulaire, 20 = bout de l'auriculaire
-
+    // Points cles de la main (21 landmarks MediaPipe)
     const wrist = landmarks[0];
-    const palmBase = landmarks[9];
     const thumbTip = landmarks[4];
-    const indexTip = landmarks[8];
-    const middleTip = landmarks[12];
-    const ringTip = landmarks[16];
-    const pinkyTip = landmarks[20];
-
-    // MCP joints (base des doigts)
     const indexMCP = landmarks[5];
+    const indexPIP = landmarks[6];
+    const indexTip = landmarks[8];
     const middleMCP = landmarks[9];
+    const middlePIP = landmarks[10];
+    const middleTip = landmarks[12];
     const ringMCP = landmarks[13];
+    const ringPIP = landmarks[14];
+    const ringTip = landmarks[16];
     const pinkyMCP = landmarks[17];
+    const pinkyPIP = landmarks[18];
+    const pinkyTip = landmarks[20];
 
     // Calculer la taille de reference (distance poignet -> base majeur)
     const handSize = Math.sqrt(
-      Math.pow(palmBase.x - wrist.x, 2) +
-      Math.pow(palmBase.y - wrist.y, 2)
+      Math.pow(middleMCP.x - wrist.x, 2) +
+      Math.pow(middleMCP.y - wrist.y, 2)
     );
 
-    // Pour un poing, les bouts des doigts doivent etre plus bas (y plus grand)
-    // que les MCP joints, ou tres proches
-    const fingersCurled = (
-      indexTip.y > indexMCP.y - handSize * 0.1 &&
-      middleTip.y > middleMCP.y - handSize * 0.1 &&
-      ringTip.y > ringMCP.y - handSize * 0.1 &&
-      pinkyTip.y > pinkyMCP.y - handSize * 0.1
-    );
+    if (handSize < 0.05) return false; // Main trop petite/loin
 
-    // Le pouce doit aussi etre replie (proche de l'index)
-    const thumbDistance = Math.sqrt(
+    // === METRIQUE 1: Distance bout de doigt -> paume (normalisee) ===
+    // Pour un poing, les bouts sont proches de la paume
+    const palmCenter = {
+      x: (wrist.x + middleMCP.x) / 2,
+      y: (wrist.y + middleMCP.y) / 2
+    };
+
+    const distanceToPlam = (tip) => Math.sqrt(
+      Math.pow(tip.x - palmCenter.x, 2) + Math.pow(tip.y - palmCenter.y, 2)
+    ) / handSize;
+
+    const indexDist = distanceToPlam(indexTip);
+    const middleDist = distanceToPlam(middleTip);
+    const ringDist = distanceToPlam(ringTip);
+    const pinkyDist = distanceToPlam(pinkyTip);
+
+    // Score: plus les doigts sont proches de la paume, plus le score est eleve
+    const distScore = Math.max(0, 1 - (indexDist + middleDist + ringDist + pinkyDist) / 4);
+
+    // === METRIQUE 2: Angle de courbure des doigts ===
+    // Verifier si les doigts sont plies (PIP plus haut que tip en Y)
+    const fingerCurled = (mcp, pip, tip) => {
+      // Le doigt est plie si le bout est plus bas (Y plus grand) que le PIP
+      // et si le PIP est entre MCP et tip
+      const curled = tip.y > pip.y - handSize * 0.05;
+      return curled ? 1 : 0;
+    };
+
+    const indexCurled = fingerCurled(indexMCP, indexPIP, indexTip);
+    const middleCurled = fingerCurled(middleMCP, middlePIP, middleTip);
+    const ringCurled = fingerCurled(ringMCP, ringPIP, ringTip);
+    const pinkyCurled = fingerCurled(pinkyMCP, pinkyPIP, pinkyTip);
+
+    const curlScore = (indexCurled + middleCurled + ringCurled + pinkyCurled) / 4;
+
+    // === METRIQUE 3: Compacite de la main ===
+    // Un poing est plus compact (tous les points proches les uns des autres)
+    const allTips = [thumbTip, indexTip, middleTip, ringTip, pinkyTip];
+    let maxDist = 0;
+    for (let i = 0; i < allTips.length; i++) {
+      for (let j = i + 1; j < allTips.length; j++) {
+        const d = Math.sqrt(
+          Math.pow(allTips[i].x - allTips[j].x, 2) +
+          Math.pow(allTips[i].y - allTips[j].y, 2)
+        );
+        if (d > maxDist) maxDist = d;
+      }
+    }
+    const compactScore = Math.max(0, 1 - maxDist / (handSize * 2));
+
+    // === METRIQUE 4: Position du pouce ===
+    // Pour un poing, le pouce est replie vers l'index
+    const thumbToIndex = Math.sqrt(
       Math.pow(thumbTip.x - indexMCP.x, 2) +
       Math.pow(thumbTip.y - indexMCP.y, 2)
-    );
-    const thumbCurled = thumbDistance < handSize * 0.8;
+    ) / handSize;
+    const thumbScore = Math.max(0, 1 - thumbToIndex);
 
-    return fingersCurled && thumbCurled;
+    // === SCORE FINAL PONDERE ===
+    const finalScore = (
+      distScore * 0.3 +      // 30% distance a la paume
+      curlScore * 0.35 +     // 35% doigts plies
+      compactScore * 0.2 +   // 20% compacite
+      thumbScore * 0.15      // 15% position du pouce
+    );
+
+    // Ajouter au historique pour lissage
+    fistScoreHistoryRef.current.push(finalScore);
+    if (fistScoreHistoryRef.current.length > FIST_HISTORY_SIZE) {
+      fistScoreHistoryRef.current.shift();
+    }
+
+    // Moyenne lissee
+    const smoothedScore = fistScoreHistoryRef.current.reduce((a, b) => a + b, 0)
+      / fistScoreHistoryRef.current.length;
+
+    return smoothedScore > FIST_THRESHOLD;
   }, []);
 
   // Initialiser MediaPipe Hand Landmarker
@@ -184,12 +252,15 @@ export function useHandTracking({ enabled = true, sensitivity = 2.0 } = {}) {
       return;
     }
 
-    // Skip frames pour optimisation (traiter 1 frame sur 2)
+    // Skip frames pour optimisation (traiter 1 frame sur 3)
     frameSkipRef.current++;
-    if (frameSkipRef.current % 2 !== 0) {
+    if (frameSkipRef.current % 3 !== 0) {
       animationFrameRef.current = requestAnimationFrame(detectHands);
       return;
     }
+
+    // Compteur pour throttler les mises à jour UI
+    uiUpdateCounterRef.current++;
 
     const now = performance.now();
     // eslint-disable-next-line no-unused-vars
@@ -210,8 +281,6 @@ export function useHandTracking({ enabled = true, sensitivity = 2.0 } = {}) {
         const fistDetected = detectFist(landmarks);
         setIsFist(fistDetected);
 
-        const isOpenHand = !fistDetected;
-
         // Verifier si la main est dans la zone d'activation
         const inZone = (
           palmCenter.x >= ACTIVATION_ZONE.xMin &&
@@ -221,7 +290,8 @@ export function useHandTracking({ enabled = true, sensitivity = 2.0 } = {}) {
         );
 
         // Gestion de la stabilisation pour activer le controle
-        if (isOpenHand && inZone) {
+        // Le controle fonctionne avec main ouverte OU poing ferme
+        if (inZone) {
           if (!controlActiveRef.current) {
             // Pas encore actif - verifier la stabilisation
             if (lastStablePositionRef.current === null) {
@@ -236,9 +306,13 @@ export function useHandTracking({ enabled = true, sensitivity = 2.0 } = {}) {
                 lastStablePositionRef.current = currentX;
                 stabilizationStartRef.current = now;
               } else {
-                // Mettre a jour la progression de stabilisation
-                const stabProgress = (now - stabilizationStartRef.current) / STABILIZATION_TIME;
-                setStabilizationProgress(Math.min(1, stabProgress));
+                // Mettre a jour la progression de stabilisation (throttled)
+                const stabProgress = Math.min(1, (now - stabilizationStartRef.current) / STABILIZATION_TIME);
+                // Ne mettre à jour le state que si changement > 10%
+                if (Math.abs(stabProgress - lastStabProgressRef.current) > 0.1 || stabProgress >= 1) {
+                  lastStabProgressRef.current = stabProgress;
+                  setStabilizationProgress(stabProgress);
+                }
 
                 if (stabProgress >= 1) {
                   // Stable assez longtemps - activer le controle!
@@ -251,54 +325,69 @@ export function useHandTracking({ enabled = true, sensitivity = 2.0 } = {}) {
             }
           }
         } else {
-          // Hors zone ou poing ferme - desactiver
+          // Hors zone - desactiver
           if (controlActiveRef.current) {
             controlActiveRef.current = false;
             setIsControlActive(false);
           }
           lastStablePositionRef.current = null;
           stabilizationStartRef.current = null;
-          setStabilizationProgress(0);
+          if (lastStabProgressRef.current !== 0) {
+            lastStabProgressRef.current = 0;
+            setStabilizationProgress(0);
+          }
         }
 
-        // Sauvegarder tous les landmarks pour le rendu
-        setLandmarks(landmarks);
-
-        // Mettre a jour la position avec les infos de zone et controle
-        setHandPosition({
-          x: palmCenter.x,
-          y: palmCenter.y,
-          isFist: fistDetected,
-          inZone,
-          isControlActive: controlActiveRef.current,
-        });
+        // Throttler les mises à jour UI de landmarks et handPosition (1 sur 2)
+        if (uiUpdateCounterRef.current % 2 === 0) {
+          setLandmarks(landmarks);
+          setHandPosition({
+            x: palmCenter.x,
+            y: palmCenter.y,
+            isFist: fistDetected,
+            inZone,
+            isControlActive: controlActiveRef.current,
+          });
+        }
 
         // Controle de rotation seulement si actif
         if (controlActiveRef.current && lastPositionRef.current !== null) {
-          const deltaX = currentX - lastPositionRef.current;
-          const threshold = 0.015;
-
-          if (Math.abs(deltaX) > threshold) {
-            const direction = deltaX > 0 ? -1 : 1;
-            setSwipeDirection(direction);
-
-            // Calculer la velocite (distance / temps)
-            const velocity = Math.abs(deltaX) / Math.max(deltaTime, 8) * 1000;
-
-            // La rotation depend de la velocite de la main
-            // velocite faible (~0.5) = rotation lente
-            // velocite elevee (~3+) = rotation rapide
-            const velocityFactor = Math.min(velocity / 0.8, 6); // Cap a 6x, plus reactif
-            const rotationAmount = Math.abs(deltaX) * sensitivity * velocityFactor * 2.5; // Multiplicateur 2.5x
-
-            smoothedDeltaRef.current = smoothedDeltaRef.current * 0.2 + (direction * rotationAmount) * 0.8;
-            setRotationDelta(smoothedDeltaRef.current);
-          } else {
-            smoothedDeltaRef.current *= 0.95;
+          // POING = STOP la rotation
+          if (fistDetected) {
+            // Freinage rapide quand poing ferme
+            smoothedDeltaRef.current *= 0.7; // Freinage fort
             setRotationDelta(smoothedDeltaRef.current);
             if (Math.abs(smoothedDeltaRef.current) < 0.001) {
               setSwipeDirection(0);
             }
+            // Ne pas mettre a jour lastPositionRef pour reprendre au meme endroit
+          } else {
+            // Main ouverte = rotation normale
+            const deltaX = currentX - lastPositionRef.current;
+            const threshold = 0.015;
+
+            if (Math.abs(deltaX) > threshold) {
+              const direction = deltaX > 0 ? -1 : 1;
+              setSwipeDirection(direction);
+
+              // Calculer la velocite (distance / temps)
+              const velocity = Math.abs(deltaX) / Math.max(deltaTime, 8) * 1000;
+
+              // La rotation depend de la velocite de la main
+              const velocityFactor = Math.min(velocity / 0.8, 3); // Cap a 3x (reduit pour rotation plus lente)
+              const rotationAmount = Math.abs(deltaX) * sensitivity * velocityFactor * 1.0;
+
+              smoothedDeltaRef.current = smoothedDeltaRef.current * 0.2 + (direction * rotationAmount) * 0.8;
+              setRotationDelta(smoothedDeltaRef.current);
+            } else {
+              smoothedDeltaRef.current *= 0.95;
+              setRotationDelta(smoothedDeltaRef.current);
+              if (Math.abs(smoothedDeltaRef.current) < 0.001) {
+                setSwipeDirection(0);
+              }
+            }
+
+            lastPositionRef.current = currentX;
           }
         } else if (!controlActiveRef.current) {
           // Controle inactif - inertie
@@ -309,13 +398,17 @@ export function useHandTracking({ enabled = true, sensitivity = 2.0 } = {}) {
           }
         }
 
-        lastPositionRef.current = currentX;
       } else {
-        // Pas de main detectee - reset et garder l'inertie
-        setHandPosition(null);
-        setLandmarks(null);
-        setIsFist(false);
-        setStabilizationProgress(0);
+        // Pas de main detectee - reset et garder l'inertie (throttled)
+        if (uiUpdateCounterRef.current % 2 === 0) {
+          setHandPosition(null);
+          setLandmarks(null);
+          setIsFist(false);
+        }
+        if (lastStabProgressRef.current !== 0) {
+          lastStabProgressRef.current = 0;
+          setStabilizationProgress(0);
+        }
         lastPositionRef.current = null;
         lastStablePositionRef.current = null;
         stabilizationStartRef.current = null;

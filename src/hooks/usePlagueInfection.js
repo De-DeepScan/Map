@@ -107,7 +107,7 @@ export function usePlagueInfection(config = {}) {
 
         return changed ? updated : prev;
       });
-    }, 100);
+    }, 250); // Optimisé: 100ms -> 250ms pour réduire la charge CPU
 
     return () => {
       if (progressTimerRef.current) {

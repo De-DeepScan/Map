@@ -114,7 +114,6 @@ function App() {
         <Scene
           key={sceneKey}
           startAnimation={infectionStarted}
-          startCameraAnimation={showOverlay}
           onInfectionComplete={handleInfectionComplete}
           totalInfectionTime={TOTAL_TIME}
         />
