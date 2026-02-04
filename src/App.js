@@ -4,6 +4,7 @@ import { StartOverlay } from './components/StartOverlay';
 import { InfectionComplete } from './components/InfectionComplete';
 import { VictoryScreen } from './components/VictoryScreen';
 import { DilemmeVideoPopup } from './components/DilemmeVideoPopup';
+import { GeoJsonProvider } from './context/GeoJsonContext';
 import { gamemaster } from './gamemaster-client';
 import './App.css';
 
@@ -45,7 +46,8 @@ function App() {
       switch (action) {
         case 'reset':
           // Réinitialise tout sans redémarrer
-          setIntroComplete(false);
+          setInfectionStarted(false);
+          setShowOverlay(false);
           setInfectionComplete(false);
           setPlayerVictory(false);
           setStartTime(null);
@@ -55,7 +57,7 @@ function App() {
 
         case 'start_infection':
           // Démarre l'infection (skip l'intro)
-          setIntroComplete(true);
+          setInfectionStarted(true);
           setInfectionComplete(false);
           setPlayerVictory(false);
           gamemaster.updateState({ status: 'infection_started' });
@@ -70,7 +72,8 @@ function App() {
 
         case 'restart':
           // Redémarrage complet de l'application
-          setIntroComplete(false);
+          setInfectionStarted(false);
+          setShowOverlay(false);
           setInfectionComplete(false);
           setPlayerVictory(false);
           setStartTime(null);
@@ -155,15 +158,16 @@ function App() {
   }, []);
 
   return (
+    <GeoJsonProvider>
     <div className="App" key={appKey}>
-      {/* Écran d'introduction ALERT */}
-      {!introComplete && (
-        <AlertIntro onComplete={() => setIntroComplete(true)} />
+      {/* Écran d'introduction */}
+      {!infectionStarted && (
+        <StartOverlay onComplete={() => setInfectionStarted(true)} />
       )}
 
       {/* Scène 3D avec la Terre et l'infection */}
       <Scene
-        startAnimation={introComplete}
+        startAnimation={infectionStarted}
         onInfectionComplete={handleInfectionComplete}
       />
 
@@ -182,6 +186,7 @@ function App() {
       {/* Écran final - Planète infectée */}
       <InfectionComplete visible={infectionComplete && !playerVictory} />
     </div>
+    </GeoJsonProvider>
   );
 }
 
