@@ -2,51 +2,160 @@ import { useState, useEffect, useCallback } from 'react';
 import { Scene } from './components';
 import { AlertIntro } from './components/AlertIntro';
 import { InfectionComplete } from './components/InfectionComplete';
+import { VictoryScreen } from './components/VictoryScreen';
+import { DilemmeVideoPopup } from './components/DilemmeVideoPopup';
+import { gamemaster } from './gamemaster-client';
 import './App.css';
 
-const TOTAL_TIME = 5 * 60 * 1000; // 5 минут
+const TOTAL_TIME = 15 * 60 * 1000; // 15 minutes
 
 /**
  * Composant App
  *
  * Composant principal de l'application
  * Affiche la scène 3D avec la planète Terre et le système d'infection
+ * Intégration avec le backoffice via gamemaster
  */
 function App() {
   const [introComplete, setIntroComplete] = useState(false);
   const [infectionComplete, setInfectionComplete] = useState(false);
+  const [playerVictory, setPlayerVictory] = useState(false);
   const [startTime, setStartTime] = useState(null);
+  const [appKey, setAppKey] = useState(0); // Pour forcer le reset complet
 
-  // Запускаем таймер после intro
+  // État pour les dilemmes
+  const [currentDilemme, setCurrentDilemme] = useState(null);
+
+  // Enregistrement auprès du backoffice
+  useEffect(() => {
+    gamemaster.register('infection-map', 'Carte Infection', [
+      { id: 'reset', label: 'Réinitialiser' },
+      { id: 'start_infection', label: 'Démarrer l\'infection' },
+      { id: 'player_victory', label: 'Victoire joueurs' },
+      { id: 'restart', label: 'Redémarrer' },
+      { id: 'show_dilemme', label: 'Afficher dilemme', params: ['dilemmeId', 'choiceId'] },
+      { id: 'hide_dilemme', label: 'Masquer dilemme' },
+    ]);
+
+    // Écoute des commandes du backoffice
+    gamemaster.onCommand(({ action, payload }) => {
+      console.log('[App] Commande reçue:', action, payload);
+
+      switch (action) {
+        case 'reset':
+          // Réinitialise tout sans redémarrer
+          setIntroComplete(false);
+          setInfectionComplete(false);
+          setPlayerVictory(false);
+          setStartTime(null);
+          setCurrentDilemme(null);
+          gamemaster.updateState({ status: 'reset', infected: 0 });
+          break;
+
+        case 'start_infection':
+          // Démarre l'infection (skip l'intro)
+          setIntroComplete(true);
+          setInfectionComplete(false);
+          setPlayerVictory(false);
+          gamemaster.updateState({ status: 'infection_started' });
+          break;
+
+        case 'player_victory':
+          // Victoire des joueurs
+          setPlayerVictory(true);
+          setInfectionComplete(false);
+          gamemaster.updateState({ status: 'player_victory' });
+          break;
+
+        case 'restart':
+          // Redémarrage complet de l'application
+          setIntroComplete(false);
+          setInfectionComplete(false);
+          setPlayerVictory(false);
+          setStartTime(null);
+          setCurrentDilemme(null);
+          setAppKey(prev => prev + 1); // Force le remount
+          gamemaster.updateState({ status: 'restarted', infected: 0 });
+          break;
+
+        case 'show_dilemme':
+          // Affiche un dilemme avec sa vidéo
+          const dilemmeId = payload.dilemmeId || payload.dilemme_id;
+          const choiceId = payload.choiceId || payload.choice_id;
+          if (dilemmeId && choiceId) {
+            setCurrentDilemme({ dilemmeId, choiceId });
+            gamemaster.updateState({ status: 'dilemme_shown', dilemmeId, choiceId });
+          }
+          break;
+
+        case 'hide_dilemme':
+          // Masque le dilemme en cours
+          setCurrentDilemme(null);
+          gamemaster.updateState({ status: 'dilemme_hidden' });
+          break;
+
+        default:
+          console.warn('[App] Commande inconnue:', action);
+      }
+    });
+
+    // État initial
+    gamemaster.updateState({ status: 'ready', infected: 0 });
+  }, []);
+
+  // Gestion des paramètres URL pour le test des dilemmes
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const dilemmeId = params.get('dilemme');
+    const choiceId = params.get('choice');
+
+    if (dilemmeId && choiceId) {
+      console.log('[App] Test dilemme via URL:', dilemmeId, choiceId);
+      setCurrentDilemme({ dilemmeId, choiceId });
+    }
+  }, []);
+
+  // Démarrage du timer après l'intro
   useEffect(() => {
     if (introComplete && !startTime) {
       setStartTime(Date.now());
+      gamemaster.updateState({ status: 'infection_running' });
     }
   }, [introComplete, startTime]);
 
-  // Проверяем прошло ли 5 минут
+  // Vérification du temps écoulé (15 minutes)
   useEffect(() => {
-    if (!startTime || infectionComplete) return;
+    if (!startTime || infectionComplete || playerVictory) return;
 
     const timer = setInterval(() => {
       const elapsed = Date.now() - startTime;
       if (elapsed >= TOTAL_TIME) {
         setInfectionComplete(true);
+        gamemaster.updateState({ status: 'infection_complete' });
         clearInterval(timer);
       }
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [startTime, infectionComplete]);
+  }, [startTime, infectionComplete, playerVictory]);
 
-  // Callback для завершения заражения (вызывается из Scene)
+  // Callback pour la fin de l'infection (appelé depuis Scene)
   const handleInfectionComplete = useCallback(() => {
-    setInfectionComplete(true);
+    if (!playerVictory) {
+      setInfectionComplete(true);
+      gamemaster.updateState({ status: 'infection_complete' });
+    }
+  }, [playerVictory]);
+
+  // Callback pour fermer le dilemme
+  const handleDilemmeClose = useCallback(() => {
+    setCurrentDilemme(null);
+    gamemaster.updateState({ status: 'dilemme_closed' });
   }, []);
 
   return (
-    <div className="App">
-      {/* Вступительный экран ALERT */}
+    <div className="App" key={appKey}>
+      {/* Écran d'introduction ALERT */}
       {!introComplete && (
         <AlertIntro onComplete={() => setIntroComplete(true)} />
       )}
@@ -57,8 +166,20 @@ function App() {
         onInfectionComplete={handleInfectionComplete}
       />
 
-      {/* Финальный экран - Планета заражена */}
-      <InfectionComplete visible={infectionComplete} />
+      {/* Popup vidéo des dilemmes */}
+      {currentDilemme && (
+        <DilemmeVideoPopup
+          dilemmeId={currentDilemme.dilemmeId}
+          choiceId={currentDilemme.choiceId}
+          onClose={handleDilemmeClose}
+        />
+      )}
+
+      {/* Écran de victoire des joueurs */}
+      <VictoryScreen visible={playerVictory} />
+
+      {/* Écran final - Planète infectée */}
+      <InfectionComplete visible={infectionComplete && !playerVictory} />
     </div>
   );
 }
