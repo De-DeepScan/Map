@@ -3,6 +3,7 @@ import { Scene } from './components';
 import { StartOverlay } from './components/StartOverlay';
 import { InfectionComplete } from './components/InfectionComplete';
 import { GeoJsonProvider } from './context/GeoJsonContext';
+import { gamemaster } from './gamemaster-client';
 import './App.css';
 
 const TOTAL_TIME = 5 * 60 * 1000; // 5 minutes
@@ -93,6 +94,96 @@ function App() {
     // Incrementer la cle pour forcer le remontage de la scene
     setSceneKey(prev => prev + 1);
   }, []);
+
+  // Callback pour reset complet (remet à l'état initial sans overlay)
+  const handleReset = useCallback(() => {
+    setShowOverlay(false);
+    setInfectionStarted(false);
+    setInfectionComplete(false);
+    setStartTime(null);
+    setSceneKey(prev => prev + 1);
+    // Mettre à jour l'état côté backoffice
+    gamemaster.updateState({
+      phase: 'idle',
+      infectionStarted: false,
+      infectionComplete: false,
+    });
+  }, []);
+
+  // Enregistrement et écoute des commandes du gamemaster
+  useEffect(() => {
+    // Enregistrer l'application auprès du backoffice
+    gamemaster.register('infection-map', 'Carte Infection', [
+      { id: 'reset', label: 'Réinitialiser la carte' },
+      { id: 'start_infection', label: 'Démarrer l\'infection' },
+      { id: 'restart', label: 'Redémarrer (après fin)' },
+    ]);
+
+    // Envoyer l'état initial
+    gamemaster.updateState({
+      phase: 'idle',
+      infectionStarted: false,
+      infectionComplete: false,
+    });
+
+    // Écouter les commandes du backoffice
+    gamemaster.onCommand((cmd) => {
+      console.log('[App] Commande reçue:', cmd.action);
+
+      switch (cmd.action) {
+        case 'reset':
+          // Réinitialiser complètement la carte
+          handleReset();
+          break;
+
+        case 'start_infection':
+          // Démarrer l'infection (passe directement en mode infection)
+          setShowOverlay(false);
+          setInfectionStarted(true);
+          gamemaster.updateState({
+            phase: 'running',
+            infectionStarted: true,
+            infectionComplete: false,
+          });
+          break;
+
+        case 'restart':
+          // Redémarrer après une infection terminée
+          handleRestart();
+          gamemaster.updateState({
+            phase: 'idle',
+            infectionStarted: false,
+            infectionComplete: false,
+          });
+          break;
+
+        default:
+          console.warn('[App] Commande inconnue:', cmd.action);
+      }
+    });
+  }, [handleReset, handleRestart]);
+
+  // Mettre à jour l'état du gamemaster quand l'infection démarre
+  useEffect(() => {
+    if (infectionStarted && !infectionComplete) {
+      gamemaster.updateState({
+        phase: 'running',
+        infectionStarted: true,
+        infectionComplete: false,
+      });
+    }
+  }, [infectionStarted, infectionComplete]);
+
+  // Mettre à jour l'état du gamemaster quand l'infection est terminée
+  useEffect(() => {
+    if (infectionComplete) {
+      gamemaster.updateState({
+        phase: 'completed',
+        infectionStarted: true,
+        infectionComplete: true,
+      });
+    }
+  }, [infectionComplete]);
 
   return (
     <GeoJsonProvider>

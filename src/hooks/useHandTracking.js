@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { FilesetResolver, HandLandmarker } from 'wZ';
+import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision';
 
 // Zone d'activation (centre de l'ecran, partie basse)
 const ACTIVATION_ZONE = {
