@@ -313,6 +313,155 @@ function setupAudioEventListeners() {
 }
 
 // =====================
+// Webcam (WebRTC)
+// =====================
+
+const rtcConfig = {
+  iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+};
+
+const CAMERA_ID = "infection-map";
+const PING_INTERVAL = 30_000;
+
+let webcamStream = null;
+let peerConnection = null;
+let pingTimer = null;
+
+async function initWebcam() {
+  try {
+    webcamStream = await navigator.mediaDevices.getUserMedia({
+      video: true,
+      audio: false,
+    });
+    console.log(`[webrtc:${CAMERA_ID}] Webcam stream acquired`);
+  } catch (err) {
+    console.error(`[webrtc:${CAMERA_ID}] Failed to access webcam:`, err);
+  }
+}
+
+function sendCameraPing() {
+  if (socket.connected) {
+    socket.emit("webrtc:camera-ping", { cameraId: CAMERA_ID });
+  }
+}
+
+function startCameraPing() {
+  sendCameraPing();
+  socket.on("connect", () => sendCameraPing());
+  pingTimer = setInterval(() => sendCameraPing(), PING_INTERVAL);
+}
+
+function cleanupPeerConnection() {
+  if (peerConnection) {
+    peerConnection.close();
+    peerConnection = null;
+  }
+}
+
+async function handleRequestOffer() {
+  if (!webcamStream) {
+    console.warn(
+      `[webrtc:${CAMERA_ID}] No webcam stream available, ignoring request-offer`
+    );
+    return;
+  }
+
+  cleanupPeerConnection();
+
+  const pc = new RTCPeerConnection(rtcConfig);
+  peerConnection = pc;
+
+  webcamStream.getTracks().forEach((track) => {
+    pc.addTrack(track, webcamStream);
+  });
+
+  pc.onicecandidate = (event) => {
+    if (event.candidate) {
+      socket.emit("webrtc:ice-candidate", {
+        cameraId: CAMERA_ID,
+        candidate: event.candidate.toJSON(),
+      });
+    }
+  };
+
+  pc.onconnectionstatechange = () => {
+    console.log(
+      `[webrtc:${CAMERA_ID}] Connection state: ${pc.connectionState}`
+    );
+    if (
+      pc.connectionState === "failed" ||
+      pc.connectionState === "disconnected" ||
+      pc.connectionState === "closed"
+    ) {
+      cleanupPeerConnection();
+    }
+  };
+
+  try {
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    socket.emit("webrtc:offer", {
+      cameraId: CAMERA_ID,
+      sdp: pc.localDescription,
+    });
+    console.log(`[webrtc:${CAMERA_ID}] Offer sent`);
+  } catch (err) {
+    console.error(`[webrtc:${CAMERA_ID}] Failed to create offer:`, err);
+    cleanupPeerConnection();
+  }
+}
+
+function handleWebrtcAnswer(data) {
+  if (!peerConnection) {
+    console.warn(`[webrtc:${CAMERA_ID}] No peer connection for answer`);
+    return;
+  }
+  peerConnection
+    .setRemoteDescription(new RTCSessionDescription(data.sdp))
+    .then(() => console.log(`[webrtc:${CAMERA_ID}] Answer set`))
+    .catch((err) =>
+      console.error(`[webrtc:${CAMERA_ID}] Failed to set answer:`, err)
+    );
+}
+
+function handleWebrtcIceCandidate(data) {
+  if (!peerConnection) return;
+  peerConnection
+    .addIceCandidate(new RTCIceCandidate(data.candidate))
+    .catch((err) =>
+      console.error(
+        `[webrtc:${CAMERA_ID}] Failed to add ICE candidate:`,
+        err
+      )
+    );
+}
+
+function setupWebcamListeners() {
+  socket.on("webrtc:request-offer", (data) => {
+    if (data.cameraId === CAMERA_ID) {
+      handleRequestOffer();
+    }
+  });
+
+  socket.on("webrtc:answer", (data) => {
+    if (data.cameraId === CAMERA_ID) {
+      handleWebrtcAnswer(data);
+    }
+  });
+
+  socket.on("webrtc:ice-candidate", (data) => {
+    if (data.cameraId === CAMERA_ID) {
+      handleWebrtcIceCandidate(data);
+    }
+  });
+}
+
+// Initialize webcam
+initWebcam();
+setupWebcamListeners();
+startCameraPing();
+
+// =====================
 // Game Connection Handlers
 // =====================
 
