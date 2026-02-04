@@ -3,11 +3,11 @@ import { useState, useEffect } from 'react';
 /**
  * VictoryScreen
  *
- * Ecran de victoire des joueurs - L'IA a ete desactivee
- * - Style digital vert
- * - "Menace neutralisee"
+ * Écran de victoire des joueurs
+ * S'affiche quand l'infection est repoussée
+ * Style digital vert (victoire)
  */
-export function VictoryScreen({ visible = false, onRestart = null }) {
+export function VictoryScreen({ visible = false }) {
   const [fadeIn, setFadeIn] = useState(false);
   const [showContent, setShowContent] = useState(false);
 
@@ -28,163 +28,108 @@ export function VictoryScreen({ visible = false, onRestart = null }) {
       position: 'fixed',
       top: 0,
       left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: fadeIn ? 'rgba(0, 10, 5, 0.95)' : 'transparent',
+      width: '100vw',
+      height: '100vh',
+      backgroundColor: fadeIn ? 'rgba(0, 20, 0, 0.95)' : 'transparent',
       display: 'flex',
-      flexDirection: 'column',
-      justifyContent: 'center',
       alignItems: 'center',
+      justifyContent: 'center',
       zIndex: 10000,
-      transition: 'background-color 1.5s ease-in',
+      transition: 'background-color 0.8s ease-out',
+      overflow: 'hidden',
     }}>
-      {/* Scanlines */}
+      {/* Lignes de scan */}
       <div style={{
         position: 'absolute',
         top: 0,
         left: 0,
         right: 0,
         bottom: 0,
-        background: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 255, 100, 0.02) 2px, rgba(0, 255, 100, 0.02) 4px)',
+        background: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 255, 0, 0.03) 2px, rgba(0, 255, 0, 0.03) 4px)',
         pointerEvents: 'none',
-        opacity: fadeIn ? 1 : 0,
-        transition: 'opacity 1s ease-in',
       }} />
 
-      {/* Contenu */}
+      {/* Contenu principal */}
       <div style={{
+        textAlign: 'center',
         opacity: showContent ? 1 : 0,
         transform: showContent ? 'scale(1)' : 'scale(0.9)',
-        transition: 'all 1s ease-out',
-        textAlign: 'center',
+        transition: 'all 0.6s ease-out',
       }}>
-        {/* Icone bouclier / check */}
+        {/* Icône de succès */}
         <div style={{
-          fontSize: '100px',
-          marginBottom: '40px',
-          color: '#00ff66',
-          textShadow: '0 0 30px #00ff66, 0 0 60px #00ff66, 0 0 90px #00ff66',
-          animation: 'pulse-victory 2s ease-in-out infinite',
+          fontSize: '80px',
+          marginBottom: '30px',
+          animation: 'pulse-green 2s infinite',
         }}>
           ✓
         </div>
 
-        {/* Texte principal */}
-        <div style={{
-          fontFamily: '"Courier New", "Consolas", monospace',
-          fontSize: '72px',
+        {/* Titre */}
+        <h1 style={{
+          fontFamily: '"Courier New", monospace',
+          fontSize: 'clamp(32px, 6vw, 72px)',
           fontWeight: 'bold',
-          color: '#00ff66',
-          letterSpacing: '8px',
+          color: '#00ff00',
           textTransform: 'uppercase',
-          textShadow: '0 0 20px #00ff66, 0 0 40px #00ff66, 0 0 80px rgba(0, 255, 102, 0.5)',
-          marginBottom: '20px',
-        }}>
-          MENACE
-        </div>
-
-        <div style={{
-          fontFamily: '"Courier New", "Consolas", monospace',
-          fontSize: '72px',
-          fontWeight: 'bold',
-          color: '#00ff66',
           letterSpacing: '8px',
-          textTransform: 'uppercase',
-          textShadow: '0 0 20px #00ff66, 0 0 40px #00ff66, 0 0 80px rgba(0, 255, 102, 0.5)',
+          margin: '0 0 20px 0',
+          textShadow: '0 0 30px rgba(0, 255, 0, 0.8), 0 0 60px rgba(0, 255, 0, 0.4)',
+          animation: 'glow-green 2s ease-in-out infinite alternate',
         }}>
-          NEUTRALISÉE
-        </div>
+          VICTOIRE
+        </h1>
 
-        {/* Ligne */}
-        <div style={{
-          width: '500px',
-          height: '2px',
-          backgroundColor: '#00ff66',
-          margin: '50px auto',
-          boxShadow: '0 0 20px #00ff66, 0 0 40px #00ff66',
-          animation: 'line-pulse-victory 1.5s ease-in-out infinite',
-        }} />
-
-        {/* Status */}
+        {/* Sous-titre */}
         <div style={{
           fontFamily: '"Courier New", monospace',
-          fontSize: '18px',
-          color: '#00ffff',
+          fontSize: 'clamp(16px, 3vw, 28px)',
+          color: '#00cc00',
           letterSpacing: '4px',
-          textShadow: '0 0 10px #00ffff',
-          marginBottom: '15px',
+          marginBottom: '40px',
+          textShadow: '0 0 20px rgba(0, 255, 0, 0.5)',
         }}>
-          IA DÉSACTIVÉE
-        </div>
-
-        <div style={{
-          fontFamily: '"Courier New", monospace',
-          fontSize: '14px',
-          color: '#00ff66',
-          letterSpacing: '3px',
-          opacity: 0.8,
-        }}>
-          ░░░ PLANÈTE SAUVÉE ░░░
+          L'HUMANITÉ A SURVÉCU
         </div>
 
         {/* Message */}
         <div style={{
           fontFamily: '"Courier New", monospace',
+          fontSize: '14px',
+          color: '#00aa00',
+          letterSpacing: '2px',
+          maxWidth: '600px',
+          margin: '0 auto',
+          lineHeight: '1.8',
+        }}>
+          <div style={{ marginBottom: '10px' }}>INFECTION NEUTRALISÉE</div>
+          <div style={{ marginBottom: '10px' }}>SYSTÈME STABILISÉ</div>
+          <div>MENACE ÉLIMINÉE</div>
+        </div>
+
+        {/* Statut */}
+        <div style={{
+          fontFamily: '"Courier New", monospace',
           fontSize: '12px',
-          color: '#666',
+          color: '#006600',
           letterSpacing: '2px',
           marginTop: '40px',
         }}>
-          VICTOIRE DES JOUEURS
+          SIMULATION TERMINÉE
         </div>
-
-        {/* Bouton de redemarrage */}
-        {onRestart && (
-          <button
-            onClick={onRestart}
-            style={{
-              marginTop: '50px',
-              padding: '15px 40px',
-              fontFamily: '"Courier New", monospace',
-              fontSize: '16px',
-              fontWeight: 'bold',
-              letterSpacing: '3px',
-              textTransform: 'uppercase',
-              color: '#00ffff',
-              backgroundColor: 'transparent',
-              border: '2px solid #00ffff',
-              cursor: 'pointer',
-              transition: 'all 0.3s ease',
-              boxShadow: '0 0 15px rgba(0, 255, 255, 0.3)',
-            }}
-            onMouseEnter={(e) => {
-              e.target.style.backgroundColor = 'rgba(0, 255, 255, 0.1)';
-              e.target.style.boxShadow = '0 0 30px rgba(0, 255, 255, 0.6)';
-              e.target.style.transform = 'scale(1.05)';
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.backgroundColor = 'transparent';
-              e.target.style.boxShadow = '0 0 15px rgba(0, 255, 255, 0.3)';
-              e.target.style.transform = 'scale(1)';
-            }}
-          >
-            ⟲ RECOMMENCER
-          </button>
-        )}
       </div>
 
-      {/* Coins du cadre */}
+      {/* Coins décoratifs */}
       <div style={{
         position: 'absolute',
         top: '30px',
         left: '30px',
         width: '80px',
         height: '80px',
-        borderTop: '3px solid #00ff66',
-        borderLeft: '3px solid #00ff66',
-        boxShadow: '0 0 20px rgba(0, 255, 102, 0.5)',
-        opacity: showContent ? 1 : 0,
-        transition: 'opacity 1s ease-in 0.5s',
+        borderTop: '3px solid #00ff00',
+        borderLeft: '3px solid #00ff00',
+        opacity: showContent ? 0.8 : 0,
+        transition: 'opacity 0.5s ease-out 0.3s',
       }} />
       <div style={{
         position: 'absolute',
@@ -192,11 +137,10 @@ export function VictoryScreen({ visible = false, onRestart = null }) {
         right: '30px',
         width: '80px',
         height: '80px',
-        borderTop: '3px solid #00ff66',
-        borderRight: '3px solid #00ff66',
-        boxShadow: '0 0 20px rgba(0, 255, 102, 0.5)',
-        opacity: showContent ? 1 : 0,
-        transition: 'opacity 1s ease-in 0.5s',
+        borderTop: '3px solid #00ff00',
+        borderRight: '3px solid #00ff00',
+        opacity: showContent ? 0.8 : 0,
+        transition: 'opacity 0.5s ease-out 0.3s',
       }} />
       <div style={{
         position: 'absolute',
@@ -204,11 +148,10 @@ export function VictoryScreen({ visible = false, onRestart = null }) {
         left: '30px',
         width: '80px',
         height: '80px',
-        borderBottom: '3px solid #00ff66',
-        borderLeft: '3px solid #00ff66',
-        boxShadow: '0 0 20px rgba(0, 255, 102, 0.5)',
-        opacity: showContent ? 1 : 0,
-        transition: 'opacity 1s ease-in 0.5s',
+        borderBottom: '3px solid #00ff00',
+        borderLeft: '3px solid #00ff00',
+        opacity: showContent ? 0.8 : 0,
+        transition: 'opacity 0.5s ease-out 0.3s',
       }} />
       <div style={{
         position: 'absolute',
@@ -216,35 +159,21 @@ export function VictoryScreen({ visible = false, onRestart = null }) {
         right: '30px',
         width: '80px',
         height: '80px',
-        borderBottom: '3px solid #00ff66',
-        borderRight: '3px solid #00ff66',
-        boxShadow: '0 0 20px rgba(0, 255, 102, 0.5)',
-        opacity: showContent ? 1 : 0,
-        transition: 'opacity 1s ease-in 0.5s',
+        borderBottom: '3px solid #00ff00',
+        borderRight: '3px solid #00ff00',
+        opacity: showContent ? 0.8 : 0,
+        transition: 'opacity 0.5s ease-out 0.3s',
       }} />
 
-      {/* CSS animations */}
+      {/* Animations CSS */}
       <style>{`
-        @keyframes pulse-victory {
-          0%, 100% {
-            transform: scale(1);
-            opacity: 1;
-          }
-          50% {
-            transform: scale(1.1);
-            opacity: 0.8;
-          }
+        @keyframes pulse-green {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.7; transform: scale(1.05); }
         }
-
-        @keyframes line-pulse-victory {
-          0%, 100% {
-            opacity: 1;
-            width: 500px;
-          }
-          50% {
-            opacity: 0.7;
-            width: 520px;
-          }
+        @keyframes glow-green {
+          from { text-shadow: 0 0 30px rgba(0, 255, 0, 0.8), 0 0 60px rgba(0, 255, 0, 0.4); }
+          to { text-shadow: 0 0 40px rgba(0, 255, 0, 1), 0 0 80px rgba(0, 255, 0, 0.6); }
         }
       `}</style>
     </div>

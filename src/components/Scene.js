@@ -82,11 +82,13 @@ const EarthGroup = memo(function EarthGroup({ onCountrySelect, showGeoJson = tru
         rotationSpeed={0.001}
       />
 
-      {/* Système d'infection des pays */}
+      {/* Система заражения по странам (в пределах границ) */}
+      {/* 15 минут - заражение замедлено */}
       <CountryInfectionSystem
         autoStart={startAnimation}
         startCountry="France"
-        totalInfectionTime={totalInfectionTime}
+        spreadInterval={3600}       // 3.6 секунды между волнами (3x plus lent)
+        infectionDuration={4500}    // 4.5 секунды на заполнение страны (3x plus lent)
         color="#ff0000"
         rotationSpeed={0.001}
         onStatsUpdate={onStatsUpdate}

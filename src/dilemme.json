@@ -5,13 +5,13 @@
         "choices": [
             {
                 "description": "Utiliser l'IA pour manipuler l'opinion et bloquer son élection.",
-                "id": "1"
+                "id": "1",
+                "nom_video": "manifestation_video.mp4"
             },
             {
                 "description": "Laisser l'IA neutre et ne pas intervenir sur les réseaux.",
                 "id": "2",
-                "nom_video": "election_droite_manifestation.mp4",
-                "nom_video2": "election_droite.mp4"
+                "nom_video": "election_droite.mp4"
             }
         ]
     },

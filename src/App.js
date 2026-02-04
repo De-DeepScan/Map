@@ -3,264 +3,185 @@ import { Scene } from './components';
 import { StartOverlay } from './components/StartOverlay';
 import { InfectionComplete } from './components/InfectionComplete';
 import { VictoryScreen } from './components/VictoryScreen';
-import { GeoJsonProvider } from './context/GeoJsonContext';
+import { DilemmeVideoPopup } from './components/DilemmeVideoPopup';
 import { gamemaster } from './gamemaster-client';
 import './App.css';
 
-const TOTAL_TIME = 5 * 60 * 1000; // 5 minutes
-
-// Styles pour l'indication de demarrage
-const styles = {
-  startHint: {
-    position: 'fixed',
-    bottom: '40px',
-    left: '50%',
-    transform: 'translateX(-50%)',
-    color: 'rgba(255, 255, 255, 0.7)',
-    fontSize: '16px',
-    fontFamily: "'Courier New', monospace",
-    letterSpacing: '2px',
-    textTransform: 'uppercase',
-    zIndex: 100,
-    animation: 'pulse 2s infinite',
-    textShadow: '0 0 10px rgba(0, 255, 255, 0.5)',
-  },
-};
+const TOTAL_TIME = 15 * 60 * 1000; // 15 minutes
 
 /**
  * Composant App
  *
  * Composant principal de l'application
  * Affiche la scène 3D avec la planète Terre et le système d'infection
+ * Intégration avec le backoffice via gamemaster
  */
 function App() {
   const [showOverlay, setShowOverlay] = useState(false); // Overlay ATTENTION visible
   const [infectionStarted, setInfectionStarted] = useState(false); // Infection demarre apres overlay
   const [infectionComplete, setInfectionComplete] = useState(false);
+  const [playerVictory, setPlayerVictory] = useState(false);
   const [startTime, setStartTime] = useState(null);
-  const [sceneKey, setSceneKey] = useState(0); // Cle pour forcer le reset de la scene
-  const [triggerRegression, setTriggerRegression] = useState(false); // Declenche la regression
-  const [playerVictory, setPlayerVictory] = useState(false); // Victoire des joueurs (regression terminee)
+  const [appKey, setAppKey] = useState(0); // Pour forcer le reset complet
 
-  // Ecouter l'appui sur une touche pour afficher l'overlay
+  // État pour les dilemmes
+  const [currentDilemme, setCurrentDilemme] = useState(null);
+
+  // Enregistrement auprès du backoffice
   useEffect(() => {
-    if (showOverlay || infectionStarted) return; // Deja en cours
+    gamemaster.register('infection-map', 'Carte Infection', [
+      { id: 'reset', label: 'Réinitialiser' },
+      { id: 'start_infection', label: 'Démarrer l\'infection' },
+      { id: 'player_victory', label: 'Victoire joueurs' },
+      { id: 'restart', label: 'Redémarrer' },
+      { id: 'show_dilemme', label: 'Afficher dilemme', params: ['dilemmeId', 'choiceId'] },
+      { id: 'hide_dilemme', label: 'Masquer dilemme' },
+    ]);
 
-    const handleKeyDown = (e) => {
-      // Ignorer certaines touches systeme
-      if (e.key === 'F5' || e.key === 'F12' || e.ctrlKey || e.altKey || e.metaKey) return;
-      setShowOverlay(true);
-    };
+    // Écoute des commandes du backoffice
+    gamemaster.onCommand(({ action, payload }) => {
+      console.log('[App] Commande reçue:', action, payload);
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showOverlay, infectionStarted]);
+      switch (action) {
+        case 'reset':
+          // Réinitialise tout sans redémarrer
+          setIntroComplete(false);
+          setInfectionComplete(false);
+          setPlayerVictory(false);
+          setStartTime(null);
+          setCurrentDilemme(null);
+          gamemaster.updateState({ status: 'reset', infected: 0 });
+          break;
 
-  // Demarrer le timer quand l'infection commence
+        case 'start_infection':
+          // Démarre l'infection (skip l'intro)
+          setIntroComplete(true);
+          setInfectionComplete(false);
+          setPlayerVictory(false);
+          gamemaster.updateState({ status: 'infection_started' });
+          break;
+
+        case 'player_victory':
+          // Victoire des joueurs
+          setPlayerVictory(true);
+          setInfectionComplete(false);
+          gamemaster.updateState({ status: 'player_victory' });
+          break;
+
+        case 'restart':
+          // Redémarrage complet de l'application
+          setIntroComplete(false);
+          setInfectionComplete(false);
+          setPlayerVictory(false);
+          setStartTime(null);
+          setCurrentDilemme(null);
+          setAppKey(prev => prev + 1); // Force le remount
+          gamemaster.updateState({ status: 'restarted', infected: 0 });
+          break;
+
+        case 'show_dilemme':
+          // Affiche un dilemme avec sa vidéo
+          const dilemmeId = payload.dilemmeId || payload.dilemme_id;
+          const choiceId = payload.choiceId || payload.choice_id;
+          if (dilemmeId && choiceId) {
+            setCurrentDilemme({ dilemmeId, choiceId });
+            gamemaster.updateState({ status: 'dilemme_shown', dilemmeId, choiceId });
+          }
+          break;
+
+        case 'hide_dilemme':
+          // Masque le dilemme en cours
+          setCurrentDilemme(null);
+          gamemaster.updateState({ status: 'dilemme_hidden' });
+          break;
+
+        default:
+          console.warn('[App] Commande inconnue:', action);
+      }
+    });
+
+    // État initial
+    gamemaster.updateState({ status: 'ready', infected: 0 });
+  }, []);
+
+  // Gestion des paramètres URL pour le test des dilemmes
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const dilemmeId = params.get('dilemme');
+    const choiceId = params.get('choice');
+
+    if (dilemmeId && choiceId) {
+      console.log('[App] Test dilemme via URL:', dilemmeId, choiceId);
+      setCurrentDilemme({ dilemmeId, choiceId });
+    }
+  }, []);
+
+  // Démarrage du timer après l'intro
   useEffect(() => {
     if (infectionStarted && !startTime) {
       setStartTime(Date.now());
+      gamemaster.updateState({ status: 'infection_running' });
     }
   }, [infectionStarted, startTime]);
 
-  // Проверяем прошло ли 5 минут
+  // Vérification du temps écoulé (15 minutes)
   useEffect(() => {
-    if (!startTime || infectionComplete || triggerRegression || playerVictory) return;
+    if (!startTime || infectionComplete || playerVictory) return;
 
     const timer = setInterval(() => {
       const elapsed = Date.now() - startTime;
       if (elapsed >= TOTAL_TIME) {
         setInfectionComplete(true);
+        gamemaster.updateState({ status: 'infection_complete' });
         clearInterval(timer);
       }
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [startTime, infectionComplete, triggerRegression, playerVictory]);
+  }, [startTime, infectionComplete, playerVictory]);
 
-  // Callback для завершения заражения (вызывается из Scene)
+  // Callback pour la fin de l'infection (appelé depuis Scene)
   const handleInfectionComplete = useCallback(() => {
-    setInfectionComplete(true);
-  }, []);
-
-  // Callback pour la fin de la regression (victoire des joueurs)
-  const handleRegressionComplete = useCallback(() => {
-    setTriggerRegression(false);
-    setPlayerVictory(true);
-    gamemaster.updateState({
-      phase: 'player_victory',
-      infectionStarted: false,
-      infectionComplete: false,
-      playerVictory: true,
-    });
-  }, []);
-
-  // Callback pour demarrer l'infection
-  const handleStartInfection = useCallback(() => {
-    setInfectionStarted(true);
-  }, []);
-
-  // Callback pour redemarrer la simulation
-  const handleRestart = useCallback(() => {
-    setShowOverlay(false);
-    setInfectionStarted(false);
-    setInfectionComplete(false);
-    setStartTime(null);
-    setTriggerRegression(false);
-    setPlayerVictory(false);
-    // Incrementer la cle pour forcer le remontage de la scene
-    setSceneKey(prev => prev + 1);
-  }, []);
-
-  // Callback pour reset complet (remet à l'état initial sans overlay)
-  const handleReset = useCallback(() => {
-    setShowOverlay(false);
-    setInfectionStarted(false);
-    setInfectionComplete(false);
-    setStartTime(null);
-    setTriggerRegression(false);
-    setPlayerVictory(false);
-    setSceneKey(prev => prev + 1);
-    // Mettre à jour l'état côté backoffice
-    gamemaster.updateState({
-      phase: 'idle',
-      infectionStarted: false,
-      infectionComplete: false,
-      playerVictory: false,
-    });
-  }, []);
-
-  // Enregistrement et écoute des commandes du gamemaster
-  useEffect(() => {
-    // Enregistrer l'application auprès du backoffice
-    gamemaster.register('infection-map', 'Carte Infection', [
-      { id: 'reset', label: 'Réinitialiser la carte' },
-      { id: 'start_infection', label: 'Démarrer l\'infection' },
-      { id: 'player_victory', label: 'Victoire joueurs (désactive IA)' },
-      { id: 'restart', label: 'Redémarrer (après fin)' },
-    ]);
-
-    // Envoyer l'état initial
-    gamemaster.updateState({
-      phase: 'idle',
-      infectionStarted: false,
-      infectionComplete: false,
-      playerVictory: false,
-    });
-
-    // Écouter les commandes du backoffice
-    gamemaster.onCommand((cmd) => {
-      console.log('[App] Commande reçue:', cmd.action);
-
-      switch (cmd.action) {
-        case 'reset':
-          // Réinitialiser complètement la carte
-          handleReset();
-          break;
-
-        case 'start_infection':
-          // Démarrer l'infection (passe directement en mode infection)
-          setShowOverlay(false);
-          setInfectionStarted(true);
-          setTriggerRegression(false);
-          setPlayerVictory(false);
-          gamemaster.updateState({
-            phase: 'running',
-            infectionStarted: true,
-            infectionComplete: false,
-            playerVictory: false,
-          });
-          break;
-
-        case 'player_victory':
-          // Victoire des joueurs - déclencher la régression de l'infection
-          // Ne fonctionne que si l'infection est en cours et pas à 100%
-          if (infectionStarted && !infectionComplete && !triggerRegression && !playerVictory) {
-            console.log('[App] Déclenchement de la victoire joueurs - régression');
-            setTriggerRegression(true);
-            gamemaster.updateState({
-              phase: 'regressing',
-              infectionStarted: true,
-              infectionComplete: false,
-              playerVictory: false,
-            });
-          } else {
-            console.warn('[App] Impossible de déclencher la victoire: infection non en cours ou déjà à 100%');
-          }
-          break;
-
-        case 'restart':
-          // Redémarrer après une infection terminée
-          handleRestart();
-          gamemaster.updateState({
-            phase: 'idle',
-            infectionStarted: false,
-            infectionComplete: false,
-            playerVictory: false,
-          });
-          break;
-
-        default:
-          console.warn('[App] Commande inconnue:', cmd.action);
-      }
-    });
-  }, [handleReset, handleRestart, infectionStarted, infectionComplete, triggerRegression, playerVictory]);
-
-  // Mettre à jour l'état du gamemaster quand l'infection démarre
-  useEffect(() => {
-    if (infectionStarted && !infectionComplete) {
-      gamemaster.updateState({
-        phase: 'running',
-        infectionStarted: true,
-        infectionComplete: false,
-      });
+    if (!playerVictory) {
+      setInfectionComplete(true);
+      gamemaster.updateState({ status: 'infection_complete' });
     }
-  }, [infectionStarted, infectionComplete]);
+  }, [playerVictory]);
 
-  // Mettre à jour l'état du gamemaster quand l'infection est terminée
-  useEffect(() => {
-    if (infectionComplete) {
-      gamemaster.updateState({
-        phase: 'completed',
-        infectionStarted: true,
-        infectionComplete: true,
-      });
-    }
-  }, [infectionComplete]);
+  // Callback pour fermer le dilemme
+  const handleDilemmeClose = useCallback(() => {
+    setCurrentDilemme(null);
+    gamemaster.updateState({ status: 'dilemme_closed' });
+  }, []);
 
   return (
-    <GeoJsonProvider>
-      <div className="App">
-        {/* Indication pour demarrer (en bas de l'ecran) */}
-        {!showOverlay && !infectionStarted && (
-          <div style={styles.startHint}>
-            Appuyez sur une touche pour demarrer
-          </div>
-        )}
+    <div className="App" key={appKey}>
+      {/* Écran d'introduction ALERT */}
+      {!introComplete && (
+        <AlertIntro onComplete={() => setIntroComplete(true)} />
+      )}
 
-        {/* Overlay ATTENTION - s'affiche apres appui sur une touche */}
-        <StartOverlay
-          visible={showOverlay && !infectionStarted}
-          onStart={handleStartInfection}
+      {/* Scène 3D avec la Terre et l'infection */}
+      <Scene
+        startAnimation={introComplete}
+        onInfectionComplete={handleInfectionComplete}
+      />
+
+      {/* Popup vidéo des dilemmes */}
+      {currentDilemme && (
+        <DilemmeVideoPopup
+          dilemmeId={currentDilemme.dilemmeId}
+          choiceId={currentDilemme.choiceId}
+          onClose={handleDilemmeClose}
         />
+      )}
 
-        {/* Scene 3D avec la Terre et l'infection */}
-        <Scene
-          key={sceneKey}
-          startAnimation={infectionStarted}
-          onInfectionComplete={handleInfectionComplete}
-          totalInfectionTime={TOTAL_TIME}
-          triggerRegression={triggerRegression}
-          onRegressionComplete={handleRegressionComplete}
-        />
+      {/* Écran de victoire des joueurs */}
+      <VictoryScreen visible={playerVictory} />
 
-        {/* Ecran final - Planete infectee (defaite) */}
-        <InfectionComplete visible={infectionComplete} onRestart={handleRestart} />
-
-        {/* Ecran de victoire - IA desactivee */}
-        <VictoryScreen visible={playerVictory} onRestart={handleRestart} />
-      </div>
-    </GeoJsonProvider>
+      {/* Écran final - Planète infectée */}
+      <InfectionComplete visible={infectionComplete && !playerVictory} />
+    </div>
   );
 }
 
