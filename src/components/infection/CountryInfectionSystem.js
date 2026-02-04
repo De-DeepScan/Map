@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { CountryInfectionLayer } from './CountryInfectionLayer';
 import { TransmissionArcsManager } from './TransmissionArcsManager';
@@ -11,8 +11,9 @@ import { usePlagueInfection } from '../../hooks/usePlagueInfection';
  * - Arcs de transmission (une seule ligne par paire de pays)
  * - Infection qui se propage depuis le point d'arrivee
  * - Duree totale configurable (defaut: 5 minutes)
+ * - Mode regression (victoire joueurs): l'infection se retire
  */
-export function CountryInfectionSystem({
+export const CountryInfectionSystem = forwardRef(function CountryInfectionSystem({
   autoStart = false,
   startCountry = 'France',
   color = '#ff0000',
@@ -20,7 +21,9 @@ export function CountryInfectionSystem({
   rotationSpeed = 0.001,
   totalInfectionTime = 300000,  // 5 minutes par defaut (en ms)
   onStatsUpdate,
-}) {
+  onRegressionComplete,
+  triggerRegression = false,
+}, ref) {
   const groupRef = useRef();
 
   const {
@@ -29,7 +32,10 @@ export function CountryInfectionSystem({
     stats,
     geoDataLoaded,
     startInfection,
+    startRegression,
     isRunning,
+    isRegressing,
+    regressionComplete,
     getCountryCentroid,
   } = usePlagueInfection({
     totalInfectionTime,
@@ -40,12 +46,29 @@ export function CountryInfectionSystem({
     longDistanceProbability: 0.4,
   });
 
+  // Exposer les méthodes via ref
+  useImperativeHandle(ref, () => ({
+    startRegression: () => startRegression(),
+    isRegressing: isRegressing,
+    canStartRegression: () => {
+      const infectedCount = Object.keys(infectedCountries).length;
+      return infectedCount > 0 && infectedCount < stats.total;
+    },
+  }), [startRegression, isRegressing, infectedCountries, stats.total]);
+
   // Autostart
   useEffect(() => {
-    if (autoStart && geoDataLoaded && !isRunning) {
+    if (autoStart && geoDataLoaded && !isRunning && !isRegressing) {
       startInfection(startCountry);
     }
-  }, [autoStart, geoDataLoaded, isRunning, startCountry, startInfection]);
+  }, [autoStart, geoDataLoaded, isRunning, isRegressing, startCountry, startInfection]);
+
+  // Trigger regression from parent
+  useEffect(() => {
+    if (triggerRegression && !isRegressing) {
+      startRegression();
+    }
+  }, [triggerRegression, isRegressing, startRegression]);
 
   // Stats update
   useEffect(() => {
@@ -53,6 +76,13 @@ export function CountryInfectionSystem({
       onStatsUpdate(stats);
     }
   }, [stats, onStatsUpdate]);
+
+  // Regression complete callback
+  useEffect(() => {
+    if (regressionComplete && onRegressionComplete) {
+      onRegressionComplete();
+    }
+  }, [regressionComplete, onRegressionComplete]);
 
   // Rotation
   useFrame(() => {
@@ -76,9 +106,10 @@ export function CountryInfectionSystem({
         getCountryCentroid={getCountryCentroid}
         color={arcColor}
         longDistanceColor="#ff6644"
+        fadeOut={isRegressing}
       />
     </group>
   );
-}
+});
 
 export default CountryInfectionSystem;

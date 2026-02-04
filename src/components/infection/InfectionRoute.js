@@ -19,10 +19,12 @@ export function InfectionRoute({
   color = '#ff3333',
   onArrival,              // Callback a l'arrivee
   delay = 0,
+  fadeOut = false,        // Mode regression: faire disparaitre la ligne
 }) {
   const lineRef = useRef();
   const [arrived, setArrived] = useState(false);
   const startTime = useRef(null);
+  const fadeOutStartTime = useRef(null);
 
   // Calculer les points de la courbe
   const points = useMemo(() => {
@@ -96,6 +98,22 @@ export function InfectionRoute({
   useFrame((state) => {
     if (!startTime.current) {
       startTime.current = state.clock.elapsedTime;
+    }
+
+    // Gestion du fadeOut (regression)
+    if (fadeOut) {
+      if (!fadeOutStartTime.current) {
+        fadeOutStartTime.current = state.clock.elapsedTime;
+      }
+      const fadeElapsed = state.clock.elapsedTime - fadeOutStartTime.current;
+      const fadeProgress = Math.min(1, fadeElapsed / 2.0); // 2 secondes pour disparaitre
+
+      if (lineRef.current) {
+        // La ligne se "dé-dessine" progressivement (de la fin vers le debut)
+        lineMaterial.uniforms.uProgress.value = Math.max(0, 1 - fadeProgress);
+        lineMaterial.uniforms.uOpacity.value = Math.max(0, 1 - fadeProgress * 0.5);
+      }
+      return;
     }
 
     const elapsed = state.clock.elapsedTime - startTime.current - delay;

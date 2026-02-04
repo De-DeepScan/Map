@@ -12,6 +12,7 @@ export const TransmissionArcsManager = memo(function TransmissionArcsManager({
   getCountryCentroid,
   color = '#ff3333',
   longDistanceColor = '#ff6644',
+  fadeOut = false,
 }) {
   return (
     <group name="transmission-arcs-manager">
@@ -35,6 +36,7 @@ export const TransmissionArcsManager = memo(function TransmissionArcsManager({
             duration={duration}
             color={arcColor}
             delay={0}
+            fadeOut={fadeOut}
           />
         );
       })}

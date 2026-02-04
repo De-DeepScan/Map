@@ -43,6 +43,8 @@ export function usePlagueInfection(config = {}) {
   const connectedPairsRef = useRef(new Set());
 
   const [isRunning, setIsRunning] = useState(false);
+  const [isRegressing, setIsRegressing] = useState(false);
+  const [regressionComplete, setRegressionComplete] = useState(false);
   const [stats, setStats] = useState({ infected: 0, total: 0 });
 
   // Donnees des pays
@@ -55,6 +57,7 @@ export function usePlagueInfection(config = {}) {
   const neighborSpreadTimerRef = useRef(null);
   const longDistanceTimerRef = useRef(null);
   const infectionStartTimeRef = useRef(null);
+  const regressionStartTimeRef = useRef(null);
 
   // Chargement GeoJSON
   useEffect(() => {
@@ -115,6 +118,74 @@ export function usePlagueInfection(config = {}) {
       }
     };
   }, [isRunning, infectionSpeed, totalInfectionTime]);
+
+  // === REGRESSION DE L'INFECTION (VICTOIRE JOUEURS) ===
+  useEffect(() => {
+    if (!isRegressing) return;
+
+    // Vitesse de regression: on veut que ca prenne environ 8 secondes pour tout effacer
+    const regressionDuration = 8000;
+    const regressionSpeed = 1.0 / regressionDuration;
+
+    progressTimerRef.current = setInterval(() => {
+      const now = Date.now();
+      const elapsed = regressionStartTimeRef.current ? now - regressionStartTimeRef.current : 0;
+
+      setInfectedCountries(prev => {
+        const updated = { ...prev };
+        let changed = false;
+
+        // Trier les pays par ordre inverse d'infection (derniers infectés disparaissent en premier)
+        const sortedCountries = Object.keys(prev).sort((a, b) => {
+          return (prev[b].startTime || 0) - (prev[a].startTime || 0);
+        });
+
+        sortedCountries.forEach((countryName, index) => {
+          const country = prev[countryName];
+          // Délai progressif: les derniers pays infectés disparaissent en premier
+          const countryDelay = index * 30; // 30ms entre chaque pays
+          const countryElapsed = Math.max(0, elapsed - countryDelay);
+
+          // Calculer la nouvelle progression (diminue)
+          const regressAmount = countryElapsed * regressionSpeed;
+          const newProgress = Math.max(0, country.progress - regressAmount);
+
+          if (newProgress <= 0) {
+            // Pays guéri - le supprimer
+            delete updated[countryName];
+            changed = true;
+          } else if (newProgress !== country.progress) {
+            updated[countryName] = {
+              ...country,
+              progress: newProgress,
+            };
+            changed = true;
+          }
+        });
+
+        // Mettre à jour les stats
+        if (changed) {
+          setStats(s => ({ ...s, infected: Object.keys(updated).length }));
+        }
+
+        // Vérifier si la régression est terminée
+        if (Object.keys(updated).length === 0) {
+          setIsRegressing(false);
+          setRegressionComplete(true);
+          setTransmissions([]);
+          connectedPairsRef.current.clear();
+        }
+
+        return changed ? updated : prev;
+      });
+    }, 50); // Plus rapide pour une animation fluide
+
+    return () => {
+      if (progressTimerRef.current) {
+        clearInterval(progressTimerRef.current);
+      }
+    };
+  }, [isRegressing]);
 
   // Fonction pour creer une cle unique pour une paire de pays
   const getPairKey = (country1, country2) => {
@@ -350,12 +421,37 @@ export function usePlagueInfection(config = {}) {
     return country?.centroid || null;
   }, [countries]);
 
+  // Démarrer la régression (victoire des joueurs)
+  const startRegression = useCallback(() => {
+    // Ne pas permettre la regression à 100% ou si pas d'infection
+    const infectedCount = Object.keys(infectedCountries).length;
+    if (infectedCount === 0 || infectedCount >= countries.length) {
+      console.log('[Infection] Cannot start regression: no infection or 100% infected');
+      return false;
+    }
+
+    // Arrêter la propagation
+    setIsRunning(false);
+    if (neighborSpreadTimerRef.current) clearInterval(neighborSpreadTimerRef.current);
+    if (longDistanceTimerRef.current) clearInterval(longDistanceTimerRef.current);
+
+    // Démarrer la régression
+    regressionStartTimeRef.current = Date.now();
+    setRegressionComplete(false);
+    setIsRegressing(true);
+
+    console.log('[Infection] Starting regression - player victory!');
+    return true;
+  }, [infectedCountries, countries.length]);
+
   // Reset
   const reset = useCallback(() => {
     setInfectedCountries({});
     setTransmissions([]);
     connectedPairsRef.current.clear();
     setIsRunning(false);
+    setIsRegressing(false);
+    setRegressionComplete(false);
     setStats(s => ({ ...s, infected: 0 }));
     if (progressTimerRef.current) clearInterval(progressTimerRef.current);
     if (neighborSpreadTimerRef.current) clearInterval(neighborSpreadTimerRef.current);
@@ -366,10 +462,13 @@ export function usePlagueInfection(config = {}) {
     infectedCountries,
     transmissions,
     isRunning,
+    isRegressing,
+    regressionComplete,
     stats,
     countries,
     geoDataLoaded,
     startInfection,
+    startRegression,
     reset,
     getCountryCentroid,
   };
