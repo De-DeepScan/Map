@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Scene } from './components';
-import { AlertIntro } from './components/AlertIntro';
+import { StartOverlay } from './components/StartOverlay';
 import { InfectionComplete } from './components/InfectionComplete';
 import { VictoryScreen } from './components/VictoryScreen';
 import { DilemmeVideoPopup } from './components/DilemmeVideoPopup';
+import { GeoJsonProvider } from './context/GeoJsonContext';
 import { gamemaster } from './gamemaster-client';
 import './App.css';
 
@@ -17,7 +18,8 @@ const TOTAL_TIME = 15 * 60 * 1000; // 15 minutes
  * Intégration avec le backoffice via gamemaster
  */
 function App() {
-  const [introComplete, setIntroComplete] = useState(false);
+  const [showOverlay, setShowOverlay] = useState(false); // Overlay ATTENTION visible
+  const [infectionStarted, setInfectionStarted] = useState(false); // Infection demarre apres overlay
   const [infectionComplete, setInfectionComplete] = useState(false);
   const [playerVictory, setPlayerVictory] = useState(false);
   const [startTime, setStartTime] = useState(null);
@@ -44,7 +46,8 @@ function App() {
       switch (action) {
         case 'reset':
           // Réinitialise tout sans redémarrer
-          setIntroComplete(false);
+          setInfectionStarted(false);
+          setShowOverlay(false);
           setInfectionComplete(false);
           setPlayerVictory(false);
           setStartTime(null);
@@ -54,7 +57,7 @@ function App() {
 
         case 'start_infection':
           // Démarre l'infection (skip l'intro)
-          setIntroComplete(true);
+          setInfectionStarted(true);
           setInfectionComplete(false);
           setPlayerVictory(false);
           gamemaster.updateState({ status: 'infection_started' });
@@ -69,7 +72,8 @@ function App() {
 
         case 'restart':
           // Redémarrage complet de l'application
-          setIntroComplete(false);
+          setInfectionStarted(false);
+          setShowOverlay(false);
           setInfectionComplete(false);
           setPlayerVictory(false);
           setStartTime(null);
@@ -117,11 +121,11 @@ function App() {
 
   // Démarrage du timer après l'intro
   useEffect(() => {
-    if (introComplete && !startTime) {
+    if (infectionStarted && !startTime) {
       setStartTime(Date.now());
       gamemaster.updateState({ status: 'infection_running' });
     }
-  }, [introComplete, startTime]);
+  }, [infectionStarted, startTime]);
 
   // Vérification du temps écoulé (15 minutes)
   useEffect(() => {
@@ -154,15 +158,16 @@ function App() {
   }, []);
 
   return (
+    <GeoJsonProvider>
     <div className="App" key={appKey}>
-      {/* Écran d'introduction ALERT */}
-      {!introComplete && (
-        <AlertIntro onComplete={() => setIntroComplete(true)} />
+      {/* Écran d'introduction */}
+      {!infectionStarted && (
+        <StartOverlay onComplete={() => setInfectionStarted(true)} />
       )}
 
       {/* Scène 3D avec la Terre et l'infection */}
       <Scene
-        startAnimation={introComplete}
+        startAnimation={infectionStarted}
         onInfectionComplete={handleInfectionComplete}
       />
 
@@ -181,6 +186,7 @@ function App() {
       {/* Écran final - Planète infectée */}
       <InfectionComplete visible={infectionComplete && !playerVictory} />
     </div>
+    </GeoJsonProvider>
   );
 }
 

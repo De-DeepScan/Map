@@ -7,7 +7,7 @@ import { useState, useEffect } from 'react';
  * - Digital стиль
  * - "Планета заражена"
  */
-export function InfectionComplete({ visible = false }) {
+export function InfectionComplete({ visible = false, onRestart = null }) {
   const [fadeIn, setFadeIn] = useState(false);
   const [showContent, setShowContent] = useState(false);
 
@@ -17,6 +17,10 @@ export function InfectionComplete({ visible = false }) {
       setTimeout(() => setFadeIn(true), 100);
       // Показываем контент с задержкой
       setTimeout(() => setShowContent(true), 800);
+    } else {
+      // Reset quand on cache l'ecran
+      setFadeIn(false);
+      setShowContent(false);
     }
   }, [visible]);
 
@@ -136,6 +140,40 @@ export function InfectionComplete({ visible = false }) {
         }}>
           SIMULATION TERMINÉE
         </div>
+
+        {/* Bouton de redémarrage */}
+        {onRestart && (
+          <button
+            onClick={onRestart}
+            style={{
+              marginTop: '50px',
+              padding: '15px 40px',
+              fontFamily: '"Courier New", monospace',
+              fontSize: '16px',
+              fontWeight: 'bold',
+              letterSpacing: '3px',
+              textTransform: 'uppercase',
+              color: '#00ffff',
+              backgroundColor: 'transparent',
+              border: '2px solid #00ffff',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease',
+              boxShadow: '0 0 15px rgba(0, 255, 255, 0.3)',
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.backgroundColor = 'rgba(0, 255, 255, 0.1)';
+              e.target.style.boxShadow = '0 0 30px rgba(0, 255, 255, 0.6)';
+              e.target.style.transform = 'scale(1.05)';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.backgroundColor = 'transparent';
+              e.target.style.boxShadow = '0 0 15px rgba(0, 255, 255, 0.3)';
+              e.target.style.transform = 'scale(1)';
+            }}
+          >
+            ⟲ RECOMMENCER
+          </button>
+        )}
       </div>
 
       {/* Углы рамки */}

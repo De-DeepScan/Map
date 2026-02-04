@@ -1,18 +1,16 @@
-import { Suspense, useState, useCallback, useRef, useEffect } from 'react';
+import { Suspense, useState, useCallback, useEffect, memo, useMemo, useRef } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Stars, Preload } from '@react-three/drei';
-import { Earth } from './Earth';
-import { Clouds } from './Clouds';
-import { Atmosphere } from './Atmosphere';
-import { NightLights } from './NightLights';
 import { CountryInfectionSystem, InfectionOrigin } from './infection';
 import { GeoJsonLayer, CountryNameDisplay, SORT_MODES } from './GeoJsonLayer';
 import { HolographicRings } from './HolographicRings';
-import { ScanLines } from './ScanLines';
 import { OceanGridShader } from './OceanGrid';
+import { BaseEarthSphere } from './BaseEarthSphere';
 import { CameraAnimator } from './CameraAnimator';
 import { NewsTicker } from './NewsTicker';
 import { InfectionHUD } from './InfectionHUD';
+import { HandTrackingOverlay } from './HandTrackingOverlay';
+import { HandRotationController } from './HandRotationController';
 
 /**
  * Composant EarthGroup (Groupe Terre)
@@ -27,10 +25,7 @@ import { InfectionHUD } from './InfectionHUD';
  *
  * Inclinaison de l'axe ~23.5° comme la vraie Terre
  */
-function EarthGroup({ onCountrySelect, showGeoJson = true, geoJsonSettings = {}, onStatsUpdate, startAnimation = true }) {
-  // Position du "Soleil" pour le calcul de l'éclairage des lumières nocturnes
-  const sunPosition = [5, 3, 5];
-
+const EarthGroup = memo(function EarthGroup({ onCountrySelect, showGeoJson = true, geoJsonSettings = {}, onStatsUpdate, startAnimation = true, totalInfectionTime = 300000, triggerRegression = false, onRegressionComplete }) {
   // Paramètres par défaut pour la couche GeoJSON
   const defaultGeoJsonSettings = {
     geoJsonUrl: '/world.geojson',
@@ -50,18 +45,20 @@ function EarthGroup({ onCountrySelect, showGeoJson = true, geoJsonSettings = {},
   return (
     // Inclinaison de l'axe terrestre (23.5 degrés = 0.41 radian)
     <group rotation={[0, 0, 0.41]}>
-      {/* Composants de texture de la planète (désactivés) */}
-      {/* <Earth rotationSpeed={0.001} /> */}
-      {/* <Clouds rotationSpeed={0.0012} /> */}
-      {/* <NightLights rotationSpeed={0.001} lightPosition={sunPosition} /> */}
-      {/* <Atmosphere /> */}
+      {/* Sphère de base */}
+      <BaseEarthSphere
+        color="#0a0a15"
+        opacity={0.3}
+        rotationSpeed={0.001}
+        enabled={true}
+      />
 
-      {/* Grille digitale sur les océans */}
+      {/* Grille digitale sur les océans - optimisée */}
       <OceanGridShader
         color="#00ddff"
         opacity={0.25}
-        gridSize={40}
-        lineWidth={0.012}
+        gridSize={25}
+        lineWidth={0.015}
         rotationSpeed={0.001}
         pulseSpeed={1.0}
         glowIntensity={1.2}
@@ -95,18 +92,12 @@ function EarthGroup({ onCountrySelect, showGeoJson = true, geoJsonSettings = {},
         color="#ff0000"
         rotationSpeed={0.001}
         onStatsUpdate={onStatsUpdate}
+        triggerRegression={triggerRegression}
+        onRegressionComplete={onRegressionComplete}
       />
-
-      {/* Lignes de scan - effet digital (désactivé) */}
-      {/* <ScanLines
-        earthRadius={2}
-        primaryColor="#00ffff"
-        secondaryColor="#00ff88"
-        enabled={true}
-      /> */}
     </group>
   );
-}
+});
 
 /**
  * Composant Lighting (Éclairage)
@@ -115,26 +106,18 @@ function EarthGroup({ onCountrySelect, showGeoJson = true, geoJsonSettings = {},
  * - Directional light = Soleil (source principale, projette des ombres)
  * - Ambient light = lumière diffuse (pour que le côté sombre ne soit pas noir)
  */
-function Lighting() {
+const Lighting = memo(function Lighting() {
   return (
     <>
       {/*
         Directional Light - simulation du Soleil
         - intensity : luminosité de la lumière
         - position : d'où elle éclaire (droite-haut-avant)
-        - castShadow : active la projection d'ombres
+        - Shadow mapping désactivé pour optimiser les performances (-16 MB GPU)
       */}
       <directionalLight
         intensity={1.5}
         position={[5, 3, 5]}
-        castShadow
-        shadow-mapSize-width={2048}
-        shadow-mapSize-height={2048}
-        shadow-camera-far={50}
-        shadow-camera-left={-10}
-        shadow-camera-right={10}
-        shadow-camera-top={10}
-        shadow-camera-bottom={-10}
       />
 
       {/*
@@ -152,7 +135,7 @@ function Lighting() {
       />
     </>
   );
-}
+});
 
 /**
  * Composant Scene (Scène)
@@ -172,22 +155,51 @@ export function Scene({
   onCountrySelect: externalOnCountrySelect = null,
   startAnimation = true,
   onInfectionComplete = null,
+  totalInfectionTime = 300000,
+  enableHandTracking = true,
+  triggerRegression = false,
+  onRegressionComplete = null,
 }) {
   // État du pays sélectionné
   const [selectedCountry, setSelectedCountry] = useState(null);
 
+  // Hand tracking - rotation delta
+  const [handRotationDelta, setHandRotationDelta] = useState(0);
+  const earthGroupRef = useRef();
+
   // Temps de démarrage de l'infection (обновляется когда startAnimation становится true)
   const [infectionStartTime, setInfectionStartTime] = useState(null);
+
+  // Chargement différé des éléments non essentiels (anneaux holographiques)
+  const [showDecorations, setShowDecorations] = useState(false);
 
   // Запускаем таймер когда анимация начинается
   useEffect(() => {
     if (startAnimation && !infectionStartTime) {
       setInfectionStartTime(Date.now());
+      // Charger les décorations après 1.5s pour accélérer l'affichage initial
+      setTimeout(() => setShowDecorations(true), 1500);
     }
   }, [startAnimation, infectionStartTime]);
 
   // Статистика заражения для HUD
   const [infectionStats, setInfectionStats] = useState({ infected: 0, total: 200 });
+
+  // Mémoïser geoJsonSettings pour éviter de recréer l'objet à chaque render
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const memoizedGeoJsonSettings = useMemo(() => geoJsonSettings, [
+    geoJsonSettings.geoJsonUrl,
+    geoJsonSettings.sortMode,
+    geoJsonSettings.interactive,
+    geoJsonSettings.useModifierKey,
+    geoJsonSettings.defaultColor,
+    geoJsonSettings.selectedColor,
+    geoJsonSettings.defaultOpacity,
+    geoJsonSettings.selectedOpacity,
+    geoJsonSettings.dimmedOpacity,
+    geoJsonSettings.lineWidth,
+    geoJsonSettings.rotationSpeed,
+  ]);
 
   // Обработчик обновления статистики
   const handleStatsUpdate = useCallback((stats) => {
@@ -225,16 +237,24 @@ export function Scene({
         <NewsTicker startTime={infectionStartTime} isRunning={true} />
       )}
 
+      {/* Hand tracking overlay - toujours actif */}
+      {enableHandTracking && (
+        <HandTrackingOverlay
+          enabled={enableHandTracking}
+          onRotationChange={setHandRotationDelta}
+          sensitivity={2.5}
+        />
+      )}
+
       <Canvas
         // Paramètres de la caméra (position initiale sera changée par CameraAnimator)
         camera={{
-          position: [0, 0, 3.2], // Commence proche (sera animé)
-          fov: 45,               // Angle de vue (field of view)
-          near: 0.1,             // Plan de découpe proche
-          far: 1000,             // Plan de découpe éloigné
+          position: [0, 0, 6], // Commence loin (vue globale)
+          fov: 45,              // Angle de vue (field of view)
+          near: 0.1,            // Plan de découpe proche
+          far: 1000,            // Plan de découpe éloigné
         }}
-        // Activer les ombres
-        shadows
+        // Shadows désactivés pour optimiser les performances
         // Paramètres du moteur de rendu WebGL
         gl={{
           antialias: true,           // Lissage des bords
@@ -248,44 +268,58 @@ export function Scene({
         <Suspense fallback={null}>
           {/* Animation de la caméra: zoom depuis Paris puis vue globale */}
           <CameraAnimator
-            startLat={48.9}         // Paris
-            startLon={2.3}
-            startDistance={3.2}     // Proche au début
-            endDistance={6}         // Vue globale à la fin
-            duration={20000}        // 20 секунд анимации
-            delay={500}             // Небольшая задержка после intro
+            startLat={30}           // France (latitude)
+            startLon={-178}         // France (longitude corrigée)
+            startDistance={3.5}     // Proche de la France
+            endDistance={6}         // Vue finale après animation
+            duration={15000}        // 15 secondes d'animation
+            delay={300}             // Petite pause avant zoom
             enabled={startAnimation}
           />
 
           {/* Éclairage de la scène */}
           <Lighting />
 
+          {/* Controleur de rotation par gestes de la main */}
+          <HandRotationController
+            targetRef={earthGroupRef}
+            rotationDelta={handRotationDelta}
+            enabled={enableHandTracking}
+          />
+
           {/* Planète Terre avec toutes ses couches */}
-          <EarthGroup
-            onCountrySelect={handleCountrySelect}
-            showGeoJson={showGeoJson}
-            geoJsonSettings={geoJsonSettings}
-            onStatsUpdate={handleStatsUpdate}
-            startAnimation={startAnimation}
-          />
+          <group ref={earthGroupRef}>
+            <EarthGroup
+              onCountrySelect={handleCountrySelect}
+              showGeoJson={showGeoJson}
+              geoJsonSettings={memoizedGeoJsonSettings}
+              onStatsUpdate={handleStatsUpdate}
+              startAnimation={startAnimation}
+              totalInfectionTime={totalInfectionTime}
+              triggerRegression={triggerRegression}
+              onRegressionComplete={onRegressionComplete}
+            />
+          </group>
 
-          {/* Anneaux holographiques de données - en dehors du groupe Terre pour une rotation indépendante */}
-          <HolographicRings
-            earthRadius={2}
-            primaryColor="#00ffff"
-            secondaryColor="#ff00ff"
-            tertiaryColor="#00ff88"
-          />
+          {/* Anneaux holographiques de données - chargement différé pour performance */}
+          {showDecorations && (
+            <HolographicRings
+              earthRadius={2}
+              primaryColor="#00ffff"
+              secondaryColor="#ff00ff"
+              tertiaryColor="#00ff88"
+            />
+          )}
 
-          {/* Fond étoilé */}
+          {/* Fond étoilé - optimisé à 5k étoiles pour chargement rapide */}
           <Stars
             radius={300}        // Rayon de la sphère d'étoiles
-            depth={60}          // Profondeur de distribution
-            count={20000}       // Nombre d'étoiles
-            factor={7}          // Taille des étoiles
+            depth={50}          // Profondeur de distribution
+            count={5000}        // Nombre d'étoiles (réduit pour performance)
+            factor={6}          // Taille des étoiles
             saturation={0}      // Saturation (0 = blanches)
             fade                // Fondu sur les bords
-            speed={0.5}         // Vitesse de scintillement
+            speed={0.3}         // Vitesse de scintillement
           />
 
           {/* Préchargement de toutes les textures */}

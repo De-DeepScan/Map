@@ -1,4 +1,4 @@
-import { useRef, useMemo } from 'react';
+import { useRef, useMemo, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { EARTH_RADIUS } from '../utils/geoUtils';
@@ -24,42 +24,51 @@ export function OceanGrid({
   // чтобы сетка была под границами стран
   const radius = EARTH_RADIUS - 0.005;
 
-  // Создаем геометрию линий сетки
-  const gridGeometry = useMemo(() => {
-    const points = [];
+  // Создаем геометрию линий сетки - возвращаем BufferGeometry вместо точек
+  const gridGeometries = useMemo(() => {
+    const geometries = [];
 
     // Линии широты (горизонтальные)
     for (let lat = -80; lat <= 80; lat += 180 / gridDensity) {
       const latRad = (90 - lat) * (Math.PI / 180);
-      const segmentPoints = [];
+      const points = [];
 
       for (let lon = 0; lon <= 360; lon += 2) {
         const lonRad = lon * (Math.PI / 180);
         const x = -radius * Math.sin(latRad) * Math.cos(lonRad);
         const y = radius * Math.cos(latRad);
         const z = radius * Math.sin(latRad) * Math.sin(lonRad);
-        segmentPoints.push(new THREE.Vector3(x, y, z));
+        points.push(new THREE.Vector3(x, y, z));
       }
-      points.push(segmentPoints);
+      const geometry = new THREE.BufferGeometry().setFromPoints(points);
+      geometries.push(geometry);
     }
 
     // Линии долготы (вертикальные)
     for (let lon = 0; lon < 360; lon += 360 / gridDensity) {
       const lonRad = lon * (Math.PI / 180);
-      const segmentPoints = [];
+      const points = [];
 
       for (let lat = -90; lat <= 90; lat += 2) {
         const latRad = (90 - lat) * (Math.PI / 180);
         const x = -radius * Math.sin(latRad) * Math.cos(lonRad);
         const y = radius * Math.cos(latRad);
         const z = radius * Math.sin(latRad) * Math.sin(lonRad);
-        segmentPoints.push(new THREE.Vector3(x, y, z));
+        points.push(new THREE.Vector3(x, y, z));
       }
-      points.push(segmentPoints);
+      const geometry = new THREE.BufferGeometry().setFromPoints(points);
+      geometries.push(geometry);
     }
 
-    return points;
+    return geometries;
   }, [radius, gridDensity]);
+
+  // Cleanup: dispose geometries on unmount
+  useEffect(() => {
+    return () => {
+      gridGeometries.forEach(geom => geom.dispose());
+    };
+  }, [gridGeometries]);
 
   // Анимация
   useFrame((state) => {
@@ -78,16 +87,8 @@ export function OceanGrid({
 
   return (
     <group ref={groupRef}>
-      {gridGeometry.map((linePoints, index) => (
-        <line key={`grid-line-${index}`}>
-          <bufferGeometry>
-            <bufferAttribute
-              attach="attributes-position"
-              count={linePoints.length}
-              array={new Float32Array(linePoints.flatMap(p => [p.x, p.y, p.z]))}
-              itemSize={3}
-            />
-          </bufferGeometry>
+      {gridGeometries.map((geometry, index) => (
+        <line key={`grid-line-${index}`} geometry={geometry}>
           <lineBasicMaterial
             ref={index === 0 ? materialRef : undefined}
             color={color}
@@ -212,12 +213,20 @@ export function OceanGridShader({
         }
       `,
       transparent: true,
-      side: THREE.FrontSide,
+      side: THREE.DoubleSide,
       depthTest: true,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
     });
   }, [color, opacity, gridSize, lineWidth, glowIntensity, oceanMask, maskThreshold, pulseSpeed]);
+
+  // Cleanup: dispose texture and material on unmount
+  useEffect(() => {
+    return () => {
+      if (oceanMask) oceanMask.dispose();
+      if (shaderMaterial) shaderMaterial.dispose();
+    };
+  }, [oceanMask, shaderMaterial]);
 
   // Анимация
   useFrame((state) => {
@@ -234,7 +243,7 @@ export function OceanGridShader({
 
   return (
     <mesh ref={meshRef}>
-      <sphereGeometry args={[radius, 64, 64]} />
+      <sphereGeometry args={[radius, 32, 32]} />
       <primitive object={shaderMaterial} ref={materialRef} attach="material" />
     </mesh>
   );
