@@ -1,8 +1,12 @@
 
-import { useState, useEffect, useCallback, useMemo, memo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, memo, useRef, createContext, useContext } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { EARTH_RADIUS } from '../utils/geoUtils';
+import { EARTH_RADIUS, subdivideRing } from '../utils/geoUtils';
+import { useGeoJson } from '../context/GeoJsonContext';
+
+// Contexte pour partager selectedCountry sans recréer les meshes
+const SelectionContext = createContext(null);
 
 /**
  * GeoJsonLayer - Couche de rendu des pays à partir de GeoJSON
@@ -27,6 +31,21 @@ export const SORT_MODES = {
   AREA_DESC: 'area_desc', // Par superficie (les plus grands en premier - recommandé)
   CUSTOM: 'custom',       // Fonction de tri personnalisée
 };
+
+/**
+ * Détecte si un anneau de coordonnées traverse l'antiméridien (±180°)
+ */
+function ringCrossesAntimeridian(ring) {
+  for (let i = 0; i < ring.length - 1; i++) {
+    const lon1 = ring[i][0];
+    const lon2 = ring[i + 1][0];
+    const dLon = Math.abs(lon2 - lon1);
+    if (dLon > 180) {
+      return true;
+    }
+  }
+  return false;
+}
 
 /**
  * Calcul approximatif de la superficie du polygone (pour le tri)
@@ -93,8 +112,6 @@ const CountryMesh = memo(({
   countryName,
   ring,
   featureIndex,
-  isSelected,
-  hasSelection,
   isInteractive,
   onCountryClick,
   // Paramètres visuels
@@ -108,34 +125,41 @@ const CountryMesh = memo(({
   renderOrderBase,
   selectedRenderOrder,
 }) => {
-  const radius = EARTH_RADIUS + 0.01; // Légèrement au-dessus de la surface de la Terre
+  const radius = EARTH_RADIUS + 0.01;
+  const lineRef = useRef();
+  const materialRef = useRef();
 
-  // Conversion lon/lat en coordonnées 3D
-  const convertToSphereCoordinates = useCallback((lon, lat) => {
-    const phi = (90 - lat) * (Math.PI / 180);
-    const theta = (lon + 180) * (Math.PI / 180);
-    return {
-      x: -radius * Math.sin(phi) * Math.cos(theta),
-      y: radius * Math.cos(phi),
-      z: radius * Math.sin(phi) * Math.sin(theta),
-    };
-  }, [radius]);
+  // Utiliser le contexte pour la sélection (évite re-création des meshes)
+  const selectedCountry = useContext(SelectionContext);
+  const isSelected = selectedCountry === countryName;
+  const hasSelection = selectedCountry !== null;
 
-  // Géométrie de la ligne de frontière
+  // Géométrie de la ligne de frontière - AMÉLIORÉE avec subdivision pour suivre la courbure
   const lineGeometry = useMemo(() => {
+    // Subdiviser le ring pour qu'il suive la courbure de la Terre
+    const subdividedRing = subdivideRing(ring, radius, 5);  // Max 5° par segment
+
     const points = [];
-    ring.forEach(([lon, lat]) => {
-      const { x, y, z } = convertToSphereCoordinates(lon, lat);
+    subdividedRing.forEach(([lon, lat]) => {
+      const phi = (90 - lat) * (Math.PI / 180);
+      const theta = (lon + 180) * (Math.PI / 180);
+      const x = -radius * Math.sin(phi) * Math.cos(theta);
+      const y = radius * Math.cos(phi);
+      const z = radius * Math.sin(phi) * Math.sin(theta);
       points.push(new THREE.Vector3(x, y, z));
     });
     return new THREE.BufferGeometry().setFromPoints(points);
-  }, [ring, convertToSphereCoordinates]);
+  }, [ring, radius]);
 
-  // Géométrie du polygone rempli (pour le clic)
+  // Géométrie du polygone rempli (pour le clic) - création stable
   const filledGeometry = useMemo(() => {
     const points = [];
     ring.forEach(([lon, lat]) => {
-      const { x, y, z } = convertToSphereCoordinates(lon, lat);
+      const phi = (90 - lat) * (Math.PI / 180);
+      const theta = (lon + 180) * (Math.PI / 180);
+      const x = -radius * Math.sin(phi) * Math.cos(theta);
+      const y = radius * Math.cos(phi);
+      const z = radius * Math.sin(phi) * Math.sin(theta);
       points.push(new THREE.Vector3(x, y, z));
     });
 
@@ -159,7 +183,52 @@ const CountryMesh = memo(({
     geometry.computeVertexNormals();
 
     return geometry;
-  }, [ring, convertToSphereCoordinates]);
+  }, [ring, radius]);
+
+  // Créer le material et le line object une seule fois
+  const lineMaterial = useMemo(() => {
+    return new THREE.LineBasicMaterial({
+      color: defaultColor,
+      transparent: true,
+      opacity: defaultOpacity,
+      linewidth: lineWidth,
+      depthTest: true,
+      depthWrite: true,
+    });
+  }, [defaultColor, defaultOpacity, lineWidth]);
+
+  const lineObject = useMemo(() => {
+    return new THREE.Line(lineGeometry, lineMaterial);
+  }, [lineGeometry, lineMaterial]);
+
+  // Mettre à jour les propriétés du material au lieu de le recréer
+  useEffect(() => {
+    if (materialRef.current || lineMaterial) {
+      const mat = materialRef.current || lineMaterial;
+      const currentColor = isSelected ? selectedColor : defaultColor;
+      const currentOpacity = isSelected
+        ? selectedOpacity
+        : hasSelection
+          ? dimmedOpacity
+          : defaultOpacity;
+
+      mat.color.set(currentColor);
+      mat.opacity = currentOpacity;
+      mat.linewidth = isSelected ? lineWidth * 2 : lineWidth;
+      mat.depthTest = !isSelected;
+      mat.depthWrite = !isSelected;
+      mat.needsUpdate = true;
+    }
+  }, [isSelected, hasSelection, selectedColor, defaultColor, selectedOpacity, dimmedOpacity, defaultOpacity, lineWidth, lineMaterial]);
+
+  // Cleanup: disposer les géométries et matériaux au unmount
+  useEffect(() => {
+    return () => {
+      if (lineGeometry) lineGeometry.dispose();
+      if (filledGeometry) filledGeometry.dispose();
+      if (lineMaterial) lineMaterial.dispose();
+    };
+  }, [lineGeometry, filledGeometry, lineMaterial]);
 
   // Gestionnaire de clic
   const handleClick = useCallback((e) => {
@@ -168,17 +237,19 @@ const CountryMesh = memo(({
     onCountryClick(isSelected ? null : countryName);
   }, [isInteractive, isSelected, countryName, onCountryClick]);
 
+  // Stocker la référence au material
+  useEffect(() => {
+    materialRef.current = lineMaterial;
+  }, [lineMaterial]);
+
+  // Stocker la référence au line object
+  useEffect(() => {
+    lineRef.current = lineObject;
+  }, [lineObject]);
+
   if (!lineGeometry || lineGeometry.attributes.position.count < 3) {
     return null;
   }
-
-  // Détermination de la couleur et de l'opacité
-  const currentColor = isSelected ? selectedColor : defaultColor;
-  const currentOpacity = isSelected
-    ? selectedOpacity
-    : hasSelection
-      ? dimmedOpacity
-      : defaultOpacity;
 
   // Ordre de rendu: les pays sélectionnés sont dessinés au-dessus
   const currentRenderOrder = isSelected ? selectedRenderOrder : renderOrderBase + featureIndex;
@@ -201,21 +272,9 @@ const CountryMesh = memo(({
         </mesh>
       )}
 
-      {/* Ligne de frontière visible */}
+      {/* Ligne de frontière visible - utilise l'objet mémoïsé */}
       <primitive
-        object={
-          new THREE.Line(
-            lineGeometry,
-            new THREE.LineBasicMaterial({
-              color: currentColor,
-              transparent: true,
-              opacity: currentOpacity,
-              linewidth: isSelected ? lineWidth * 2 : lineWidth,
-              depthTest: !isSelected,
-              depthWrite: !isSelected,
-            })
-          )
-        }
+        object={lineObject}
         renderOrder={currentRenderOrder}
       />
 
@@ -273,6 +332,7 @@ export function GeoJsonLayer({
   rotationSpeed = 0.001,
 }) {
   const groupRef = useRef();
+  const { geoData: contextGeoData } = useGeoJson();
   const [geoData, setGeoData] = useState(geoJsonData);
   const [selectedCountry, setSelectedCountry] = useState(null);
   const [isModifierPressed, setIsModifierPressed] = useState(false);
@@ -284,11 +344,11 @@ export function GeoJsonLayer({
       return;
     }
 
-    fetch(geoJsonUrl)
-      .then((response) => response.json())
-      .then((data) => setGeoData(data))
-      .catch((error) => console.error('Error loading GeoJSON:', error));
-  }, [geoJsonUrl, geoJsonData]);
+    // Utiliser les données du Context au lieu de fetch
+    if (contextGeoData) {
+      setGeoData(contextGeoData);
+    }
+  }, [geoJsonData, contextGeoData]);
 
   // Suivi du modificateur (Alt/Option)
   useEffect(() => {
@@ -361,18 +421,14 @@ export function GeoJsonLayer({
       }
 
       coordinateArrays.forEach((ring, ringIndex) => {
-        if (ring.length > 2) {
-          const isSelected = selectedCountry === countryName;
-          const hasSelection = selectedCountry !== null;
-
+        // Ignorer les anneaux qui traversent l'antiméridien (évite les lignes verticales)
+        if (ring.length > 2 && !ringCrossesAntimeridian(ring)) {
           meshes.push(
             <CountryMesh
               key={`country-${featureIndex}-${ringIndex}`}
               countryName={countryName}
               ring={ring}
               featureIndex={featureIndex}
-              isSelected={isSelected}
-              hasSelection={hasSelection}
               isInteractive={interactive && isModifierPressed}
               onCountryClick={handleCountryClick}
               defaultColor={defaultColor}
@@ -390,11 +446,11 @@ export function GeoJsonLayer({
     });
 
     return meshes;
+    // Note: selectedCountry retiré des dépendances - géré par chaque CountryMesh
   }, [
     geoData,
     sortMode,
     customSortFn,
-    selectedCountry,
     interactive,
     isModifierPressed,
     handleCountryClick,
@@ -409,9 +465,11 @@ export function GeoJsonLayer({
   ]);
 
   return (
-    <group ref={groupRef}>
-      {countryMeshes}
-    </group>
+    <SelectionContext.Provider value={selectedCountry}>
+      <group ref={groupRef}>
+        {countryMeshes}
+      </group>
+    </SelectionContext.Provider>
   );
 }
 

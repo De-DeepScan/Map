@@ -1,24 +1,21 @@
 import { useState, useEffect } from 'react';
 
 /**
- * InfectionComplete
+ * VictoryScreen
  *
- * Финальный экран после заражения всей планеты
- * - Digital стиль
- * - "Планета заражена"
+ * Ecran de victoire des joueurs - L'IA a ete desactivee
+ * - Style digital vert
+ * - "Menace neutralisee"
  */
-export function InfectionComplete({ visible = false, onRestart = null }) {
+export function VictoryScreen({ visible = false, onRestart = null }) {
   const [fadeIn, setFadeIn] = useState(false);
   const [showContent, setShowContent] = useState(false);
 
   useEffect(() => {
     if (visible) {
-      // Начинаем fade in
       setTimeout(() => setFadeIn(true), 100);
-      // Показываем контент с задержкой
       setTimeout(() => setShowContent(true), 800);
     } else {
-      // Reset quand on cache l'ecran
       setFadeIn(false);
       setShowContent(false);
     }
@@ -33,7 +30,7 @@ export function InfectionComplete({ visible = false, onRestart = null }) {
       left: 0,
       right: 0,
       bottom: 0,
-      backgroundColor: fadeIn ? 'rgba(0, 5, 10, 0.95)' : 'transparent',
+      backgroundColor: fadeIn ? 'rgba(0, 10, 5, 0.95)' : 'transparent',
       display: 'flex',
       flexDirection: 'column',
       justifyContent: 'center',
@@ -41,74 +38,74 @@ export function InfectionComplete({ visible = false, onRestart = null }) {
       zIndex: 10000,
       transition: 'background-color 1.5s ease-in',
     }}>
-      {/* Сканлайны */}
+      {/* Scanlines */}
       <div style={{
         position: 'absolute',
         top: 0,
         left: 0,
         right: 0,
         bottom: 0,
-        background: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255, 0, 68, 0.02) 2px, rgba(255, 0, 68, 0.02) 4px)',
+        background: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 255, 100, 0.02) 2px, rgba(0, 255, 100, 0.02) 4px)',
         pointerEvents: 'none',
         opacity: fadeIn ? 1 : 0,
         transition: 'opacity 1s ease-in',
       }} />
 
-      {/* Контент */}
+      {/* Contenu */}
       <div style={{
         opacity: showContent ? 1 : 0,
         transform: showContent ? 'scale(1)' : 'scale(0.9)',
         transition: 'all 1s ease-out',
         textAlign: 'center',
       }}>
-        {/* Иконка биологической опасности */}
+        {/* Icone bouclier / check */}
         <div style={{
           fontSize: '100px',
           marginBottom: '40px',
-          color: '#ff0044',
-          textShadow: '0 0 30px #ff0044, 0 0 60px #ff0044, 0 0 90px #ff0044',
-          animation: 'pulse-complete 2s ease-in-out infinite',
+          color: '#00ff66',
+          textShadow: '0 0 30px #00ff66, 0 0 60px #00ff66, 0 0 90px #00ff66',
+          animation: 'pulse-victory 2s ease-in-out infinite',
         }}>
-          ☣
+          ✓
         </div>
 
-        {/* Главный текст */}
+        {/* Texte principal */}
         <div style={{
           fontFamily: '"Courier New", "Consolas", monospace',
           fontSize: '72px',
           fontWeight: 'bold',
-          color: '#ff0044',
+          color: '#00ff66',
           letterSpacing: '8px',
           textTransform: 'uppercase',
-          textShadow: '0 0 20px #ff0044, 0 0 40px #ff0044, 0 0 80px rgba(255, 0, 68, 0.5)',
+          textShadow: '0 0 20px #00ff66, 0 0 40px #00ff66, 0 0 80px rgba(0, 255, 102, 0.5)',
           marginBottom: '20px',
         }}>
-          PLANÈTE
+          MENACE
         </div>
 
         <div style={{
           fontFamily: '"Courier New", "Consolas", monospace',
           fontSize: '72px',
           fontWeight: 'bold',
-          color: '#ff0044',
+          color: '#00ff66',
           letterSpacing: '8px',
           textTransform: 'uppercase',
-          textShadow: '0 0 20px #ff0044, 0 0 40px #ff0044, 0 0 80px rgba(255, 0, 68, 0.5)',
+          textShadow: '0 0 20px #00ff66, 0 0 40px #00ff66, 0 0 80px rgba(0, 255, 102, 0.5)',
         }}>
-          INFECTÉE
+          NEUTRALISÉE
         </div>
 
-        {/* Линия */}
+        {/* Ligne */}
         <div style={{
           width: '500px',
           height: '2px',
-          backgroundColor: '#ff0044',
+          backgroundColor: '#00ff66',
           margin: '50px auto',
-          boxShadow: '0 0 20px #ff0044, 0 0 40px #ff0044',
-          animation: 'line-pulse 1.5s ease-in-out infinite',
+          boxShadow: '0 0 20px #00ff66, 0 0 40px #00ff66',
+          animation: 'line-pulse-victory 1.5s ease-in-out infinite',
         }} />
 
-        {/* Статистика */}
+        {/* Status */}
         <div style={{
           fontFamily: '"Courier New", monospace',
           fontSize: '18px',
@@ -117,20 +114,20 @@ export function InfectionComplete({ visible = false, onRestart = null }) {
           textShadow: '0 0 10px #00ffff',
           marginBottom: '15px',
         }}>
-          INFECTION RATE: 100%
+          IA DÉSACTIVÉE
         </div>
 
         <div style={{
           fontFamily: '"Courier New", monospace',
           fontSize: '14px',
-          color: '#00ff00',
+          color: '#00ff66',
           letterSpacing: '3px',
           opacity: 0.8,
         }}>
-          ░░░ TOUS LES PAYS INFECTÉS ░░░
+          ░░░ PLANÈTE SAUVÉE ░░░
         </div>
 
-        {/* Дата */}
+        {/* Message */}
         <div style={{
           fontFamily: '"Courier New", monospace',
           fontSize: '12px',
@@ -138,10 +135,10 @@ export function InfectionComplete({ visible = false, onRestart = null }) {
           letterSpacing: '2px',
           marginTop: '40px',
         }}>
-          SIMULATION TERMINÉE
+          VICTOIRE DES JOUEURS
         </div>
 
-        {/* Bouton de redémarrage */}
+        {/* Bouton de redemarrage */}
         {onRestart && (
           <button
             onClick={onRestart}
@@ -176,16 +173,16 @@ export function InfectionComplete({ visible = false, onRestart = null }) {
         )}
       </div>
 
-      {/* Углы рамки */}
+      {/* Coins du cadre */}
       <div style={{
         position: 'absolute',
         top: '30px',
         left: '30px',
         width: '80px',
         height: '80px',
-        borderTop: '3px solid #ff0044',
-        borderLeft: '3px solid #ff0044',
-        boxShadow: '0 0 20px rgba(255, 0, 68, 0.5)',
+        borderTop: '3px solid #00ff66',
+        borderLeft: '3px solid #00ff66',
+        boxShadow: '0 0 20px rgba(0, 255, 102, 0.5)',
         opacity: showContent ? 1 : 0,
         transition: 'opacity 1s ease-in 0.5s',
       }} />
@@ -195,9 +192,9 @@ export function InfectionComplete({ visible = false, onRestart = null }) {
         right: '30px',
         width: '80px',
         height: '80px',
-        borderTop: '3px solid #ff0044',
-        borderRight: '3px solid #ff0044',
-        boxShadow: '0 0 20px rgba(255, 0, 68, 0.5)',
+        borderTop: '3px solid #00ff66',
+        borderRight: '3px solid #00ff66',
+        boxShadow: '0 0 20px rgba(0, 255, 102, 0.5)',
         opacity: showContent ? 1 : 0,
         transition: 'opacity 1s ease-in 0.5s',
       }} />
@@ -207,9 +204,9 @@ export function InfectionComplete({ visible = false, onRestart = null }) {
         left: '30px',
         width: '80px',
         height: '80px',
-        borderBottom: '3px solid #ff0044',
-        borderLeft: '3px solid #ff0044',
-        boxShadow: '0 0 20px rgba(255, 0, 68, 0.5)',
+        borderBottom: '3px solid #00ff66',
+        borderLeft: '3px solid #00ff66',
+        boxShadow: '0 0 20px rgba(0, 255, 102, 0.5)',
         opacity: showContent ? 1 : 0,
         transition: 'opacity 1s ease-in 0.5s',
       }} />
@@ -219,16 +216,16 @@ export function InfectionComplete({ visible = false, onRestart = null }) {
         right: '30px',
         width: '80px',
         height: '80px',
-        borderBottom: '3px solid #ff0044',
-        borderRight: '3px solid #ff0044',
-        boxShadow: '0 0 20px rgba(255, 0, 68, 0.5)',
+        borderBottom: '3px solid #00ff66',
+        borderRight: '3px solid #00ff66',
+        boxShadow: '0 0 20px rgba(0, 255, 102, 0.5)',
         opacity: showContent ? 1 : 0,
         transition: 'opacity 1s ease-in 0.5s',
       }} />
 
-      {/* CSS анимации */}
+      {/* CSS animations */}
       <style>{`
-        @keyframes pulse-complete {
+        @keyframes pulse-victory {
           0%, 100% {
             transform: scale(1);
             opacity: 1;
@@ -239,7 +236,7 @@ export function InfectionComplete({ visible = false, onRestart = null }) {
           }
         }
 
-        @keyframes line-pulse {
+        @keyframes line-pulse-victory {
           0%, 100% {
             opacity: 1;
             width: 500px;
@@ -254,4 +251,4 @@ export function InfectionComplete({ visible = false, onRestart = null }) {
   );
 }
 
-export default InfectionComplete;
+export default VictoryScreen;

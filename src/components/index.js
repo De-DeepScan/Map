@@ -1,10 +1,7 @@
-export { Earth } from './Earth';
-export { Clouds } from './Clouds';
-export { Atmosphere } from './Atmosphere';
-export { NightLights } from './NightLights';
 export { Scene } from './Scene';
+export { BaseEarthSphere } from './BaseEarthSphere';
 
-// GeoJSON Layer - слой с границами стран
+// GeoJSON Layer - couche avec les frontières des pays
 export {
   GeoJsonLayer,
   CountryNameDisplay,
@@ -13,8 +10,8 @@ export {
 
 // Composants d'infection
 export {
-  InfectionPoint,
-  InfectionCluster,
   InfectionRoute,
-  InfectionSystem,
+  InfectionOrigin,
+  CountryInfectionLayer,
+  CountryInfectionSystem,
 } from './infection';

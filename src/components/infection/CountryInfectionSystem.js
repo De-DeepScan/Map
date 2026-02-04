@@ -1,55 +1,90 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { CountryInfectionLayer } from './CountryInfectionLayer';
-import { useCountryInfection } from '../../hooks/useCountryInfection';
+import { TransmissionArcsManager } from './TransmissionArcsManager';
+import { usePlagueInfection } from '../../hooks/usePlagueInfection';
 
 /**
  * CountryInfectionSystem
  *
- * Полная система заражения по странам:
- * - Заражение в пределах границ стран
- * - Распространение на все страны
- * - Контролируемая скорость
+ * Systeme d'infection style Plague Inc.:
+ * - Arcs de transmission (une seule ligne par paire de pays)
+ * - Infection qui se propage depuis le point d'arrivee
+ * - Duree totale configurable (defaut: 5 minutes)
+ * - Mode regression (victoire joueurs): l'infection se retire
  */
-export function CountryInfectionSystem({
+export const CountryInfectionSystem = forwardRef(function CountryInfectionSystem({
   autoStart = false,
   startCountry = 'France',
-  spreadInterval = 2000,        // 2 секунды между заражениями
-  infectionDuration = 3000,     // 3 секунды на заражение страны
   color = '#ff0000',
+  arcColor = '#ff3333',
   rotationSpeed = 0.001,
+  totalInfectionTime = 300000,  // 5 minutes par defaut (en ms)
   onStatsUpdate,
-}) {
+  onRegressionComplete,
+  triggerRegression = false,
+}, ref) {
   const groupRef = useRef();
 
   const {
     infectedCountries,
+    transmissions,
     stats,
     geoDataLoaded,
     startInfection,
+    startRegression,
     isRunning,
-  } = useCountryInfection({
-    spreadInterval,
-    infectionDuration,
-    maxInfectedCountries: 200,
-    neighborDistance: 30,
+    isRegressing,
+    regressionComplete,
+    getCountryCentroid,
+  } = usePlagueInfection({
+    totalInfectionTime,
+    neighborSpreadInterval: 800,
+    neighborSpreadThreshold: 0.5,
+    maxSpreadPerInterval: 3,
+    longDistanceInterval: 12000,
+    longDistanceProbability: 0.4,
   });
 
-  // Автозапуск
+  // Exposer les méthodes via ref
+  useImperativeHandle(ref, () => ({
+    startRegression: () => startRegression(),
+    isRegressing: isRegressing,
+    canStartRegression: () => {
+      const infectedCount = Object.keys(infectedCountries).length;
+      return infectedCount > 0 && infectedCount < stats.total;
+    },
+  }), [startRegression, isRegressing, infectedCountries, stats.total]);
+
+  // Autostart
   useEffect(() => {
-    if (autoStart && geoDataLoaded && !isRunning) {
+    if (autoStart && geoDataLoaded && !isRunning && !isRegressing) {
       startInfection(startCountry);
     }
-  }, [autoStart, geoDataLoaded, isRunning, startCountry, startInfection]);
+  }, [autoStart, geoDataLoaded, isRunning, isRegressing, startCountry, startInfection]);
 
-  // Обновление статистики
+  // Trigger regression from parent
+  useEffect(() => {
+    if (triggerRegression && !isRegressing) {
+      startRegression();
+    }
+  }, [triggerRegression, isRegressing, startRegression]);
+
+  // Stats update
   useEffect(() => {
     if (onStatsUpdate) {
       onStatsUpdate(stats);
     }
   }, [stats, onStatsUpdate]);
 
-  // Ротация
+  // Regression complete callback
+  useEffect(() => {
+    if (regressionComplete && onRegressionComplete) {
+      onRegressionComplete();
+    }
+  }, [regressionComplete, onRegressionComplete]);
+
+  // Rotation
   useFrame(() => {
     if (groupRef.current && rotationSpeed) {
       groupRef.current.rotation.y += rotationSpeed;
@@ -58,13 +93,23 @@ export function CountryInfectionSystem({
 
   return (
     <group ref={groupRef}>
+      {/* Couche d'infection des pays (propagation depuis point d'entree) */}
       <CountryInfectionLayer
         infectedCountries={infectedCountries}
         color={color}
         rotationSpeed={0}
       />
+
+      {/* Arcs de transmission (une seule ligne par paire) */}
+      <TransmissionArcsManager
+        activeTransmissions={transmissions}
+        getCountryCentroid={getCountryCentroid}
+        color={arcColor}
+        longDistanceColor="#ff6644"
+        fadeOut={isRegressing}
+      />
     </group>
   );
-}
+});
 
 export default CountryInfectionSystem;
