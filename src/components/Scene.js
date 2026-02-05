@@ -274,7 +274,7 @@ export function Scene({
           {/* Animation de la caméra: zoom depuis Paris puis vue globale */}
           <CameraAnimator
             startLat={30}           // France (latitude)
-            startLon={-178}         // France (longitude corrigée)
+            startLon={-150}         // France (longitude - décalé à droite)
             startDistance={3.5}     // Proche de la France
             endDistance={6}         // Vue finale après animation
             duration={15000}        // 15 secondes d'animation
