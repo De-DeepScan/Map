@@ -47,20 +47,6 @@
             }
         ]
     },
-{
-        "id": "4",
-        "description": "Un de vos proches est décédé. Une IA peut simuler sa conscience parfaitement grâce à ses données privées",
-        "choices": [
-            {
-                "description": "Supprimer ses données pour respecter son intimité",
-                "id": "1"
-            },
-            {
-                "description": "Simuler la conscience d'un proche pour consoler ses parents dévastés",
-                "id": "2"
-            }
-        ]
-    },
     {
         "id": "5",
         "description": "Un orphelinat et un ehpad prennent feu au même moment. Il y assez de pompiers pour aller à un seul endroit",
