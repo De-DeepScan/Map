@@ -173,12 +173,16 @@ export function Scene({
   // Chargement différé des éléments non essentiels (anneaux holographiques)
   const [showDecorations, setShowDecorations] = useState(false);
 
-  // Запускаем таймер когда анимация начинается
+  // Запускаем таймер когда анимация начинается / réinitialiser quand elle s'arrête
   useEffect(() => {
     if (startAnimation && !infectionStartTime) {
       setInfectionStartTime(Date.now());
       // Charger les décorations après 1.5s pour accélérer l'affichage initial
       setTimeout(() => setShowDecorations(true), 1500);
+    } else if (!startAnimation && infectionStartTime) {
+      // Réinitialiser quand l'animation est arrêtée (reset depuis backoffice)
+      setInfectionStartTime(null);
+      setInfectionStats({ infected: 0, total: 200 });
     }
   }, [startAnimation, infectionStartTime]);
 
