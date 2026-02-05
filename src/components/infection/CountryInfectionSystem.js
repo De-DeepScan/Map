@@ -33,6 +33,7 @@ export const CountryInfectionSystem = forwardRef(function CountryInfectionSystem
     geoDataLoaded,
     startInfection,
     startRegression,
+    reset,
     isRunning,
     isRegressing,
     regressionComplete,
@@ -56,7 +57,19 @@ export const CountryInfectionSystem = forwardRef(function CountryInfectionSystem
     },
   }), [startRegression, isRegressing, infectedCountries, stats.total]);
 
-  // Autostart
+  // Ref pour suivre l'état précédent de autoStart
+  const prevAutoStartRef = useRef(autoStart);
+
+  // Autostart et Reset
+  useEffect(() => {
+    // Détecter le passage de autoStart de true à false (= reset demandé)
+    if (prevAutoStartRef.current && !autoStart) {
+      reset();
+    }
+    prevAutoStartRef.current = autoStart;
+  }, [autoStart, reset]);
+
+  // Démarrer l'infection quand autoStart devient true
   useEffect(() => {
     if (autoStart && geoDataLoaded && !isRunning && !isRegressing) {
       startInfection(startCountry);
