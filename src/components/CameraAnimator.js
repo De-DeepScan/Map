@@ -23,6 +23,7 @@ export function CameraAnimator({
   const startTime = useRef(null);
   const isAnimating = useRef(true);
   const initialPosition = useRef(null);
+  const prevEnabled = useRef(enabled);
 
   // Convertir lat/lon en position 3D
   const latLonToPosition = (lat, lon, distance) => {
@@ -37,7 +38,12 @@ export function CameraAnimator({
   };
 
   // Position initiale proche de la France
+  // Se déclenche au montage et quand enabled passe de false à true (après reset)
   useEffect(() => {
+    // Détecter le passage de false à true (redémarrage après reset)
+    const justEnabled = enabled && !prevEnabled.current;
+    prevEnabled.current = enabled;
+
     if (!enabled) return;
 
     // Reset animation state pour permettre une nouvelle animation

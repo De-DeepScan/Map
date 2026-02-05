@@ -16,13 +16,14 @@ export function InfectionHUD({
   startTime = null,
   totalCountries = 200,
   infectedCountries = 0,
+  isPaused = false,  // Stoppe le timer (victoire)
 }) {
   const [timeLeft, setTimeLeft] = useState(TOTAL_TIME);
   const [displayProgress, setDisplayProgress] = useState(0);
 
   // Обратный отсчёт - optimisé à 250ms au lieu de 100ms (4 updates/sec au lieu de 10)
   useEffect(() => {
-    if (!startTime) return;
+    if (!startTime || isPaused) return;
 
     const interval = setInterval(() => {
       const elapsed = Date.now() - startTime;
@@ -31,7 +32,7 @@ export function InfectionHUD({
     }, 250);
 
     return () => clearInterval(interval);
-  }, [startTime]);
+  }, [startTime, isPaused]);
 
   // Плавная анимация прогресса - optimisé à 250ms au lieu de 50ms (4 updates/sec au lieu de 20)
   useEffect(() => {

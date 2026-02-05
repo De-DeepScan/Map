@@ -233,6 +233,7 @@ export function Scene({
           startTime={infectionStartTime}
           totalCountries={infectionStats.total}
           infectedCountries={infectionStats.infected}
+          isPaused={triggerRegression}
         />
       )}
 
