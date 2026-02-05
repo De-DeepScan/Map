@@ -7,6 +7,7 @@ import { HolographicRings } from './HolographicRings';
 import { OceanGridShader } from './OceanGrid';
 import { BaseEarthSphere } from './BaseEarthSphere';
 import { CameraAnimator } from './CameraAnimator';
+import { CameraResetManager } from './CameraResetManager';
 import { NewsTicker } from './NewsTicker';
 import { InfectionHUD } from './InfectionHUD';
 import { HandTrackingOverlay } from './HandTrackingOverlay';
@@ -167,17 +168,8 @@ export function Scene({
   const [handRotationDelta, setHandRotationDelta] = useState(0);
   const earthGroupRef = useRef();
 
-  // Clé pour forcer le reset de la caméra et OrbitControls
-  const [cameraKey, setCameraKey] = useState(0);
-  const prevStartAnimation = useRef(startAnimation);
-
-  // Incrémenter la clé quand startAnimation passe de false à true (reset caméra)
-  useEffect(() => {
-    if (startAnimation && !prevStartAnimation.current) {
-      setCameraKey(prev => prev + 1);
-    }
-    prevStartAnimation.current = startAnimation;
-  }, [startAnimation]);
+  // Ref pour OrbitControls (utilisé par CameraResetManager)
+  const controlsRef = useRef();
 
   // Temps de démarrage de l'infection (обновляется когда startAnimation становится true)
   const [infectionStartTime, setInfectionStartTime] = useState(null);
@@ -285,7 +277,6 @@ export function Scene({
         <Suspense fallback={null}>
           {/* Animation de la caméra: zoom depuis Paris puis vue globale */}
           <CameraAnimator
-            key={`camera-${cameraKey}`}
             startLat={30}           // France (latitude)
             startLon={-150}         // France (longitude - décalé à droite)
             startDistance={3.5}     // Proche de la France
@@ -354,7 +345,7 @@ export function Scene({
         - minDistance/maxDistance : limites du zoom
       */}
         <OrbitControls
-          key={`orbit-${cameraKey}`}
+          ref={controlsRef}
           enableZoom={true}
           enablePan={false}
           enableDamping={true}
@@ -365,6 +356,16 @@ export function Scene({
           // Limitation de la rotation verticale (empêche de retourner la caméra)
           minPolarAngle={Math.PI * 0.2}
           maxPolarAngle={Math.PI * 0.8}
+        />
+
+        {/* Gestionnaire de reset de caméra - coordonne caméra et OrbitControls */}
+        {/* Placé APRÈS OrbitControls pour garantir que la ref soit disponible */}
+        <CameraResetManager
+          controlsRef={controlsRef}
+          enabled={startAnimation}
+          startLat={30}
+          startLon={-150}
+          startDistance={3.5}
         />
       </Canvas>
     </div>
