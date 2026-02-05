@@ -25,10 +25,9 @@ export function usePlagueInfection(config = {}) {
   } = config;
 
   // Calcul dynamique de la vitesse d'infection
-  // On veut ~8 generations pour couvrir 200 pays (2^8 = 256)
-  // Chaque generation: temps infection interne + delai trait (~3s)
-  // Temps par generation = totalTime / 10 (avec marge)
-  const timePerGeneration = totalInfectionTime / 12;
+  // Pour 15 minutes (900s), on veut que chaque pays prenne environ 10-15s pour se remplir
+  // L'accélération progressive gère le rythme global
+  const timePerGeneration = totalInfectionTime / 6;  // Plus lent pour 15 min
   const infectionSpeed = 1.0 / (timePerGeneration - 3000); // progress/ms
 
   const { geoData: contextGeoData } = useGeoJson();
@@ -82,8 +81,8 @@ export function usePlagueInfection(config = {}) {
       // Calculer le multiplicateur de vitesse base sur le temps global
       const globalElapsed = infectionStartTimeRef.current ? now - infectionStartTimeRef.current : 0;
       const timeRatio = Math.min(1, globalElapsed / totalInfectionTime);
-      // Commence a 0.5x, finit a 2x (acceleration progressive)
-      const speedMultiplier = 0.5 + Math.pow(timeRatio, 1.5) * 1.5;
+      // Commence a 0.7x, finit a 1.5x (acceleration douce pour 15 min)
+      const speedMultiplier = 0.7 + Math.pow(timeRatio, 2) * 0.8;
 
       setInfectedCountries(prev => {
         const updated = { ...prev };
@@ -213,10 +212,10 @@ export function usePlagueInfection(config = {}) {
         const elapsedTime = infectionStartTimeRef.current ? now - infectionStartTimeRef.current : 0;
         const timeRatio = Math.min(1, elapsedTime / totalInfectionTime);
 
-        // Acceleration progressive: commence a 1, finit a maxSpreadPerInterval * 2
-        // Courbe exponentielle douce: lent au debut, rapide a la fin
-        const accelerationCurve = Math.pow(timeRatio, 2); // Courbe quadratique
-        const dynamicMaxSpread = Math.max(1, Math.floor(1 + accelerationCurve * (maxSpreadPerInterval * 2 - 1)));
+        // Acceleration progressive douce pour 15 min: commence a 1, finit a maxSpreadPerInterval
+        // Courbe cubique: très lent au début, accélère vers la fin
+        const accelerationCurve = Math.pow(timeRatio, 3); // Courbe cubique (plus douce)
+        const dynamicMaxSpread = Math.max(1, Math.floor(1 + accelerationCurve * (maxSpreadPerInterval - 1)));
 
         // Pays assez infectes pour propager
         const readyToSpread = Object.keys(prev).filter(name => {
@@ -306,16 +305,16 @@ export function usePlagueInfection(config = {}) {
 
         if (remainingCountries <= 0) return prev;
 
-        // Acceleration progressive basee sur le temps ecoule
+        // Acceleration progressive basee sur le temps ecoule (plus douce pour 15 min)
         const elapsedTime = infectionStartTimeRef.current ? now - infectionStartTimeRef.current : 0;
         const timeRatio = Math.min(1, elapsedTime / totalInfectionTime);
 
-        // Probabilite augmente avec le temps (commence faible, finit haute)
-        const accelerationCurve = Math.pow(timeRatio, 1.5);
-        const effectiveProbability = longDistanceProbability * 0.3 + accelerationCurve * longDistanceProbability * 1.5;
+        // Probabilite augmente avec le temps (commence très faible, accélère vers la fin)
+        const accelerationCurve = Math.pow(timeRatio, 2.5);  // Courbe plus douce
+        const effectiveProbability = longDistanceProbability * 0.2 + accelerationCurve * longDistanceProbability * 1.2;
 
         // Seuil de progression diminue avec le temps (plus facile de propager vers la fin)
-        const minProgress = 0.8 - (accelerationCurve * 0.4); // 0.8 -> 0.4
+        const minProgress = 0.85 - (accelerationCurve * 0.35); // 0.85 -> 0.5
         const sources = infectedNames.filter(
           name => prev[name].progress >= minProgress
         );

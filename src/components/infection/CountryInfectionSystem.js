@@ -26,6 +26,9 @@ export const CountryInfectionSystem = forwardRef(function CountryInfectionSystem
 }, ref) {
   const groupRef = useRef();
 
+  // Calculer les paramètres pour que l'infection prenne exactement totalInfectionTime
+  // Avec 200 pays et 15 minutes (900s), on a ~4.5s par pays en moyenne
+  // Mais avec l'accélération progressive, on commence lentement
   const {
     infectedCountries,
     transmissions,
@@ -40,11 +43,11 @@ export const CountryInfectionSystem = forwardRef(function CountryInfectionSystem
     getCountryCentroid,
   } = usePlagueInfection({
     totalInfectionTime,
-    neighborSpreadInterval: 800,
-    neighborSpreadThreshold: 0.5,
-    maxSpreadPerInterval: 3,
-    longDistanceInterval: 12000,
-    longDistanceProbability: 0.4,
+    neighborSpreadInterval: 3500,      // 3.5 secondes entre les vagues (était 800ms)
+    neighborSpreadThreshold: 0.4,      // Propagation quand 40% infecté
+    maxSpreadPerInterval: 2,           // Max 2 pays par vague (était 3)
+    longDistanceInterval: 25000,       // Saut longue distance toutes les 25s (était 12s)
+    longDistanceProbability: 0.3,      // 30% de chance (était 40%)
   });
 
   // Exposer les méthodes via ref
