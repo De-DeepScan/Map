@@ -4,12 +4,12 @@ import { useState, useEffect } from 'react';
  * InfectionHUD
  *
  * Панель с прогрессом заражения и обратным отсчётом
- * - Обратный отсчёт 5 минут
+ * - Обратный отсчёт 15 минут
  * - Прогресс-бар заражения
  * - Digital стиль
  */
 
-const TOTAL_TIME = 5 * 60 * 1000; // 5 минут в миллисекундах
+const TOTAL_TIME = 15 * 60 * 1000; // 15 минут в миллисекундах
 
 export function InfectionHUD({
   infectionProgress = 0,  // 0-100%
