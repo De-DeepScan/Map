@@ -22,6 +22,7 @@ function App() {
   const [infectionStarted, setInfectionStarted] = useState(false); // Infection demarre apres overlay
   const [infectionComplete, setInfectionComplete] = useState(false);
   const [playerVictory, setPlayerVictory] = useState(false);
+  const [triggerRegression, setTriggerRegression] = useState(false); // Déclenche la désinfection visuelle
   const [startTime, setStartTime] = useState(null);
   const [appKey, setAppKey] = useState(0); // Pour forcer le reset complet
 
@@ -50,6 +51,7 @@ function App() {
           setShowOverlay(false);
           setInfectionComplete(false);
           setPlayerVictory(false);
+          setTriggerRegression(false);
           setStartTime(null);
           setCurrentDilemme(null);
           gamemaster.updateState({ status: 'reset', infected: 0 });
@@ -64,10 +66,10 @@ function App() {
           break;
 
         case 'player_victory':
-          // Victoire des joueurs
-          setPlayerVictory(true);
+          // Victoire des joueurs - déclenche d'abord la désinfection visuelle
+          setTriggerRegression(true);
           setInfectionComplete(false);
-          gamemaster.updateState({ status: 'player_victory' });
+          gamemaster.updateState({ status: 'regression_started' });
           break;
 
         case 'restart':
@@ -76,6 +78,7 @@ function App() {
           setShowOverlay(false);
           setInfectionComplete(false);
           setPlayerVictory(false);
+          setTriggerRegression(false);
           setStartTime(null);
           setCurrentDilemme(null);
           setAppKey(prev => prev + 1); // Force le remount
@@ -157,6 +160,13 @@ function App() {
     gamemaster.updateState({ status: 'dilemme_closed' });
   }, []);
 
+  // Callback pour la fin de la régression (désinfection terminée)
+  const handleRegressionComplete = useCallback(() => {
+    setTriggerRegression(false);
+    setPlayerVictory(true);
+    gamemaster.updateState({ status: 'player_victory' });
+  }, []);
+
   return (
     <GeoJsonProvider>
     <div className="App" key={appKey}>
@@ -169,6 +179,8 @@ function App() {
       <Scene
         startAnimation={infectionStarted}
         onInfectionComplete={handleInfectionComplete}
+        triggerRegression={triggerRegression}
+        onRegressionComplete={handleRegressionComplete}
       />
 
       {/* Popup vidéo des dilemmes */}
