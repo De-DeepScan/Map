@@ -167,6 +167,18 @@ export function Scene({
   const [handRotationDelta, setHandRotationDelta] = useState(0);
   const earthGroupRef = useRef();
 
+  // Clé pour forcer le reset de la caméra et OrbitControls
+  const [cameraKey, setCameraKey] = useState(0);
+  const prevStartAnimation = useRef(startAnimation);
+
+  // Incrémenter la clé quand startAnimation passe de false à true (reset caméra)
+  useEffect(() => {
+    if (startAnimation && !prevStartAnimation.current) {
+      setCameraKey(prev => prev + 1);
+    }
+    prevStartAnimation.current = startAnimation;
+  }, [startAnimation]);
+
   // Temps de démarrage de l'infection (обновляется когда startAnimation становится true)
   const [infectionStartTime, setInfectionStartTime] = useState(null);
 
@@ -273,6 +285,7 @@ export function Scene({
         <Suspense fallback={null}>
           {/* Animation de la caméra: zoom depuis Paris puis vue globale */}
           <CameraAnimator
+            key={`camera-${cameraKey}`}
             startLat={30}           // France (latitude)
             startLon={-150}         // France (longitude - décalé à droite)
             startDistance={3.5}     // Proche de la France
@@ -341,6 +354,7 @@ export function Scene({
         - minDistance/maxDistance : limites du zoom
       */}
         <OrbitControls
+          key={`orbit-${cameraKey}`}
           enableZoom={true}
           enablePan={false}
           enableDamping={true}
