@@ -14,7 +14,7 @@ import { useGeoJson } from '../context/GeoJsonContext';
  */
 export function usePlagueInfection(config = {}) {
   const {
-    totalInfectionTime = 300000,      // Temps total pour infecter la planete (5 min par defaut)
+    totalInfectionTime = 900000,      // Temps total pour infecter la planete (15 min par defaut)
     neighborSpreadThreshold = 0.5,    // 50% = propagation quand a moitie infecte
     neighborSpreadInterval = 800,     // Intervalle de check pour propagation
     maxSpreadPerInterval = 3,         // Nombre max de pays infectes par intervalle
@@ -123,8 +123,8 @@ export function usePlagueInfection(config = {}) {
   useEffect(() => {
     if (!isRegressing) return;
 
-    // Vitesse de regression: on veut que ca prenne environ 8 secondes pour tout effacer
-    const regressionDuration = 8000;
+    // Vitesse de regression: on veut que ca prenne environ 20 secondes pour tout effacer
+    const regressionDuration = 20000;
     const regressionSpeed = 1.0 / regressionDuration;
 
     progressTimerRef.current = setInterval(() => {

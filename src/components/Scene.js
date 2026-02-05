@@ -25,7 +25,7 @@ import { HandRotationController } from './HandRotationController';
  *
  * Inclinaison de l'axe ~23.5° comme la vraie Terre
  */
-const EarthGroup = memo(function EarthGroup({ onCountrySelect, showGeoJson = true, geoJsonSettings = {}, onStatsUpdate, startAnimation = true, totalInfectionTime = 300000, triggerRegression = false, onRegressionComplete }) {
+const EarthGroup = memo(function EarthGroup({ onCountrySelect, showGeoJson = true, geoJsonSettings = {}, onStatsUpdate, startAnimation = true, totalInfectionTime = 900000, triggerRegression = false, onRegressionComplete }) {
   // Paramètres par défaut pour la couche GeoJSON
   const defaultGeoJsonSettings = {
     geoJsonUrl: '/world.geojson',
@@ -155,7 +155,7 @@ export function Scene({
   onCountrySelect: externalOnCountrySelect = null,
   startAnimation = true,
   onInfectionComplete = null,
-  totalInfectionTime = 300000,
+  totalInfectionTime = 900000,  // 15 minutes par défaut
   enableHandTracking = true,
   triggerRegression = false,
   onRegressionComplete = null,

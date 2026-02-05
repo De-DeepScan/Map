@@ -19,7 +19,7 @@ export const CountryInfectionSystem = forwardRef(function CountryInfectionSystem
   color = '#ff0000',
   arcColor = '#ff3333',
   rotationSpeed = 0.001,
-  totalInfectionTime = 300000,  // 5 minutes par defaut (en ms)
+  totalInfectionTime = 900000,  // 15 minutes par defaut (en ms)
   onStatsUpdate,
   onRegressionComplete,
   triggerRegression = false,
