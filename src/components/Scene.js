@@ -73,10 +73,10 @@ const EarthGroup = memo(function EarthGroup({ onCountrySelect, showGeoJson = tru
         />
       )}
 
-      {/* Point d'origine de l'infection (Paris) - pulsation */}
+      {/* Point d'origine de l'infection (Bordeaux) - pulsation */}
       <InfectionOrigin
-        lat={48.9}
-        lon={2.3}
+        lat={44.84}
+        lon={-0.58}
         color="#ff0000"
         pulseSpeed={2}
         rotationSpeed={0.001}
