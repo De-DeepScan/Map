@@ -3,9 +3,9 @@ import { useState, useEffect } from 'react';
 /**
  * InfectionHUD
  *
- * Панель с прогрессом заражения и обратным отсчётом
+ * Панель с прогрессом распространения ИИ и обратным отсчётом
  * - Обратный отсчёт 15 минут
- * - Прогресс-бар заражения
+ * - Прогресс-бар распространения
  * - Digital стиль
  */
 
@@ -107,7 +107,7 @@ export function InfectionHUD({
             textTransform: 'uppercase',
             textShadow: '0 0 10px #ff0044',
           }}>
-            OUTBREAK STATUS
+            AI EXPANSION
           </span>
         </div>
 
@@ -151,7 +151,7 @@ export function InfectionHUD({
               letterSpacing: '2px',
               opacity: 0.8,
             }}>
-              INFECTION RATE
+              AI CONTROL
             </span>
             <span style={{
               color: progressColor,
@@ -231,7 +231,7 @@ export function InfectionHUD({
               letterSpacing: '1px',
               opacity: 0.7,
             }}>
-              INFECTED
+              CONTROLLED
             </div>
           </div>
 
@@ -255,7 +255,7 @@ export function InfectionHUD({
               letterSpacing: '1px',
               opacity: 0.7,
             }}>
-              REMAINING
+              FREE
             </div>
           </div>
         </div>

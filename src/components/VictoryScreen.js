@@ -102,7 +102,7 @@ export function VictoryScreen({ visible = false }) {
           margin: '0 auto',
           lineHeight: '1.8',
         }}>
-          <div style={{ marginBottom: '10px' }}>INFECTION NEUTRALISÉE</div>
+          <div style={{ marginBottom: '10px' }}>IA NEUTRALISÉE</div>
           <div style={{ marginBottom: '10px' }}>SYSTÈME STABILISÉ</div>
           <div>MENACE ÉLIMINÉE</div>
         </div>

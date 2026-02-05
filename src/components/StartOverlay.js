@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 
 /**
- * StartOverlay - Overlay d'attente avant le démarrage de l'infection
+ * StartOverlay - Overlay d'attente avant le démarrage de la propagation IA
  * Affiche "ATTENTION" et attend une touche pour démarrer
  */
 export function StartOverlay({ visible, onStart }) {
@@ -58,18 +58,8 @@ export function StartOverlay({ visible, onStart }) {
 
         {/* Message */}
         <p style={styles.subtitle}>
-          Simulation d'infection mondiale
+          Simulation de propagation IA
         </p>
-
-        {/* Instruction */}
-        <div style={{ ...styles.instruction, opacity: pulseOpacity }}>
-          Appuyez sur une touche pour lancer l'infection
-        </div>
-
-        {/* Barre de chargement animee */}
-        <div style={styles.loadingBar}>
-          <div style={styles.loadingFill} />
-        </div>
       </div>
 
       {/* Coins decoratifs */}

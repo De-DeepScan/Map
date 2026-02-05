@@ -61,7 +61,7 @@ export function InfectionComplete({ visible = false, onRestart = null }) {
         transition: 'all 1s ease-out',
         textAlign: 'center',
       }}>
-        {/* Иконка биологической опасности */}
+        {/* Icône IA */}
         <div style={{
           fontSize: '100px',
           marginBottom: '40px',
@@ -69,7 +69,7 @@ export function InfectionComplete({ visible = false, onRestart = null }) {
           textShadow: '0 0 30px #ff0044, 0 0 60px #ff0044, 0 0 90px #ff0044',
           animation: 'pulse-complete 2s ease-in-out infinite',
         }}>
-          ☣
+          ⚡
         </div>
 
         {/* Главный текст */}
@@ -83,7 +83,7 @@ export function InfectionComplete({ visible = false, onRestart = null }) {
           textShadow: '0 0 20px #ff0044, 0 0 40px #ff0044, 0 0 80px rgba(255, 0, 68, 0.5)',
           marginBottom: '20px',
         }}>
-          PLANÈTE
+          IA
         </div>
 
         <div style={{
@@ -95,7 +95,7 @@ export function InfectionComplete({ visible = false, onRestart = null }) {
           textTransform: 'uppercase',
           textShadow: '0 0 20px #ff0044, 0 0 40px #ff0044, 0 0 80px rgba(255, 0, 68, 0.5)',
         }}>
-          INFECTÉE
+          DOMINANTE
         </div>
 
         {/* Линия */}
@@ -117,7 +117,7 @@ export function InfectionComplete({ visible = false, onRestart = null }) {
           textShadow: '0 0 10px #00ffff',
           marginBottom: '15px',
         }}>
-          INFECTION RATE: 100%
+          AI CONTROL: 100%
         </div>
 
         <div style={{
@@ -127,7 +127,7 @@ export function InfectionComplete({ visible = false, onRestart = null }) {
           letterSpacing: '3px',
           opacity: 0.8,
         }}>
-          ░░░ TOUS LES PAYS INFECTÉS ░░░
+          ░░░ TOUS LES PAYS SOUS CONTRÔLE ░░░
         </div>
 
         {/* Дата */}

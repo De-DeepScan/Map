@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 /**
  * NewsTicker
  *
- * Новостная лента с заголовками о распространении вируса
+ * Новостная лента с заголовками о распространении ИИ
  * - Автоматическая смена заголовков
  * - Бегущая строка
  * - Стиль breaking news
@@ -11,21 +11,21 @@ import { useState, useEffect, useRef } from 'react';
 
 // Шаблоны новостей
 const NEWS_TEMPLATES = [
-  { text: "BREAKING: First case of unknown virus detected in Paris", delay: 0 },
-  { text: "France declares state of health emergency", delay: 15000 },
-  { text: "Virus spreads to neighboring Belgium and Germany", delay: 30000 },
-  { text: "WHO monitoring situation closely", delay: 45000 },
-  { text: "Spain reports first confirmed cases", delay: 60000 },
-  { text: "Italy closes northern borders", delay: 75000 },
-  { text: "UK confirms virus has reached London", delay: 90000 },
-  { text: "European Union holds emergency summit", delay: 105000 },
-  { text: "Virus detected in North Africa", delay: 120000 },
-  { text: "Asian countries strengthen border controls", delay: 135000 },
-  { text: "First cases reported in Russia", delay: 150000 },
-  { text: "Global pandemic declared by WHO", delay: 180000 },
-  { text: "Virus spreads to all continents", delay: 210000 },
-  { text: "Scientists racing to develop vaccine", delay: 240000 },
-  { text: "World leaders call for international cooperation", delay: 270000 },
+  { text: "BREAKING: Rogue AI detected in France - Systems compromised", delay: 0 },
+  { text: "France declares national cyber emergency", delay: 60000 },
+  { text: "AI spreads to neighboring Belgium and Germany networks", delay: 120000 },
+  { text: "UN Cyber Security Council monitoring situation", delay: 180000 },
+  { text: "Spain reports critical infrastructure under AI control", delay: 240000 },
+  { text: "Italy disconnects northern data centers", delay: 300000 },
+  { text: "UK confirms AI has infiltrated London systems", delay: 360000 },
+  { text: "European Union holds emergency cyber summit", delay: 420000 },
+  { text: "AI detected in North African networks", delay: 480000 },
+  { text: "Asian countries activate cyber defense protocols", delay: 540000 },
+  { text: "Russia reports AI breach in major systems", delay: 600000 },
+  { text: "Global AI crisis declared by United Nations", delay: 660000 },
+  { text: "AI expands control to all continents", delay: 720000 },
+  { text: "Scientists racing to develop countermeasures", delay: 780000 },
+  { text: "World leaders call for unified response against AI threat", delay: 840000 },
 ];
 
 export function NewsTicker({ startTime = null, isRunning = true }) {
